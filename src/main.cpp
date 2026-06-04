@@ -26,9 +26,9 @@ int main(int argc, char* argv[])
 #endif
 {
 #ifdef _WIN32
-    // 显式禁用控制台分配
+    // Windows平台：使用WinMain入口点，避免弹出控制台窗口
     int argc = 0;
-    char* argv[1] = { nullptr };
+    char** argv = nullptr;
 #endif
     
     // 启用高DPI支持

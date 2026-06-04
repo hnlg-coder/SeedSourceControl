@@ -3,7 +3,6 @@
 
 #include <QMainWindow>
 #include <QTimer>
-#include <QSerialPort>
 
 // Forward declarations
 class ConnectionPanel;
@@ -55,7 +54,6 @@ private:
     AlarmPanel* m_alarmPanel;
     LogPanel* m_logPanel;
     
-    QSerialPort* m_serialPort;
     CommunicationWorker* m_communicationWorker;
     SeedSourceProtocolParser* m_protocolParser;
     DeviceDataModel* m_dataModel;

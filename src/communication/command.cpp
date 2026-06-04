@@ -1,5 +1,6 @@
 #include "command.h"
 #include <QDebug>
+#include <QMetaObject>
 
 std::atomic<quint32> ICommand::s_nextId{1};
 
@@ -16,22 +17,26 @@ void ICommand::execute()
 {
     setState(Sending);
     QByteArray request = buildRequest();
-    
+
     if (request.isEmpty()) {
         setState(Error);
         setError("Failed to build request");
         emit completed(false, QVariant());
         return;
     }
-    
+
     setState(WaitingResponse);
-    m_timeoutTimer->start(timeout());
+    // 使用QMetaObject::invokeMethod确保QTimer在ICommand所在线程启动
+    // ICommand可能在主线程创建（QTimer也在主线程），但execute()可能从子线程调用
+    QMetaObject::invokeMethod(m_timeoutTimer, "start", Qt::QueuedConnection,
+                              Q_ARG(int, static_cast<int>(timeout())));
     emit sendRequest(request);
 }
 
 void ICommand::onResponse(const QByteArray& response)
 {
-    m_timeoutTimer->stop();
+    // 确保在ICommand所在线程停止定时器
+    QMetaObject::invokeMethod(m_timeoutTimer, "stop", Qt::QueuedConnection);
 
     if (m_state == WaitingResponse) {
         if (parseResponse(response)) {

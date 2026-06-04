@@ -62,14 +62,9 @@ MainWindow::~MainWindow()
     m_running = false;
     m_connected = false;
     
-    // 停止通信工作线程（由CommunicationWorker自己处理线程退出）
+    // 停止通信工作线程（由CommunicationWorker自己处理线程退出和串口关闭）
     if (m_communicationWorker) {
         m_communicationWorker->stopCommunication();
-    }
-    
-    // 关闭串口（在线程停止后）
-    if (m_serialPort && m_serialPort->isOpen()) {
-        m_serialPort->close();
     }
     
     // 关闭数据库
@@ -196,12 +191,8 @@ void MainWindow::initializeComponents()
     // 创建数据模型
     m_dataModel = new DeviceDataModel(this);
     
-    // 创建串口对象
-    m_serialPort = new QSerialPort(this);
-    
-    // 创建通信工作线程
+    // 创建通信工作线程（QSerialPort在子线程中创建和管理）
     m_communicationWorker = new CommunicationWorker(this);
-    m_communicationWorker->setSerialPort(m_serialPort);
     
     // 创建轮询定时器
     m_pollTimer = new QTimer(this);
@@ -233,6 +224,20 @@ void MainWindow::connectSignals()
     connect(m_communicationWorker, &CommunicationWorker::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
     connect(m_communicationWorker, &CommunicationWorker::logMessage, this, &MainWindow::onLogMessage);
     
+    // 命令完成信号 -> 更新数据模型
+    connect(m_communicationWorker, &CommunicationWorker::commandCompleted, this, [this](quint32 cmdId, bool success, QVariant result) {
+        if (success && result.isValid()) {
+            // 如果结果是QVariantMap（ReadStatusCommand的返回），更新数据模型
+            if (result.userType() == QMetaType::type("QVariantMap")) {
+                QVariantMap statusMap = result.toMap();
+                double current = statusMap.value("current", 0).toDouble();
+                double temperature = statusMap.value("temperature", 0).toDouble();
+                double power = statusMap.value("power", 0).toDouble();
+                m_dataModel->updateData(current, temperature, power, 0, 0);
+            }
+        }
+    });
+    
     // 数据模型信号
     connect(m_dataModel, &DeviceDataModel::dataUpdated, this, [this](const DeviceDataModel::RealTimeData&) {
         onDataUpdated();
@@ -256,18 +261,13 @@ void MainWindow::onConnectClicked()
     QSerialPort::StopBits stopBits = m_connectionPanel->selectedStopBits();
     QSerialPort::FlowControl flowControl = m_connectionPanel->selectedFlowControl();
     
-    // 设置串口参数
-    m_serialPort->setPortName(portName);
-    m_serialPort->setBaudRate(baudRate);
-    m_serialPort->setDataBits(dataBits);
-    m_serialPort->setParity(parity);
-    m_serialPort->setStopBits(stopBits);
-    m_serialPort->setFlowControl(flowControl);
+    // 设置串口配置参数（线程安全）
+    m_communicationWorker->setSerialConfig(portName, baudRate, dataBits, parity, stopBits, flowControl);
     
     // 启动通信工作线程
     m_communicationWorker->startCommunication();
     
-    // 连接设备
+    // 连接设备（通过信号通知子线程）
     m_communicationWorker->connectDevice();
     
     m_logPanel->logMessage(tr("尝试连接设备: %1, 波特率: %2").arg(portName).arg(baudRate), LogPanel::Info);
