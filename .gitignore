@@ -1,0 +1,48 @@
+# CMake
+build/
+cmake-build-*/
+*.cmake
+!CMakeLists.txt
+
+# Qt
+*.autosave
+*.pro.user
+*.pro.user.*
+*.qmlc
+*.jsc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+Makefile*
+*.o
+*.obj
+
+# Build output
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.app
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and data
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Config (keep template)
+config.ini
+alarm_config.ini
