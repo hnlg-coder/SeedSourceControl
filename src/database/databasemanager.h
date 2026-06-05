@@ -33,7 +33,6 @@ private:
     
     bool createTables();
     
-    static DatabaseManager* m_instance;
     QSqlDatabase m_database;
 };
 

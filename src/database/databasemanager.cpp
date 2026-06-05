@@ -4,18 +4,10 @@
 #include <QTextStream>
 #include <QDebug>
 
-DatabaseManager* DatabaseManager::m_instance = nullptr;
-
 DatabaseManager* DatabaseManager::instance()
 {
-    static QMutex mutex;
-    if (!m_instance) {
-        QMutexLocker locker(&mutex);
-        if (!m_instance) {
-            m_instance = new DatabaseManager();
-        }
-    }
-    return m_instance;
+    static DatabaseManager instance;
+    return &instance;
 }
 
 DatabaseManager::DatabaseManager(QObject* parent)

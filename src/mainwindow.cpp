@@ -158,6 +158,9 @@ void MainWindow::initializeComponents()
     m_dataModel = new DeviceDataModel(this);
     m_communicationWorker = new CommunicationWorker(this);
 
+    // 注册跨线程信号槽传递的类型
+    qRegisterMetaType<QSharedPointer<ICommand>>("QSharedPointer<ICommand>");
+
     m_pollTimer = new QTimer(this);
     m_pollTimer->setInterval(200);
 

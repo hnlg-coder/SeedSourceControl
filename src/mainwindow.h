@@ -4,7 +4,7 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QTabWidget>
-#include <QSplitter>
+#include <atomic>
 
 // Forward declarations
 class ConnectionPanel;
@@ -78,8 +78,8 @@ private:
     DeviceDataModel* m_dataModel;
 
     QTimer* m_pollTimer;
-    bool m_connected;
-    bool m_running;
+    std::atomic<bool> m_connected;
+    std::atomic<bool> m_running;
 };
 
 #endif // MAINWINDOW_H

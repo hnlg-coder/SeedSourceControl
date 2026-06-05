@@ -315,6 +315,10 @@ void EnhancedChartWidget::startRenderThread()
 void EnhancedChartWidget::addSeries(const QString& name, const QColor& color, const QString& unit, bool visible)
 {
     QMutexLocker locker(&m_renderThread->dataMutex);
+    // 检查是否已存在同名系列，避免覆盖导致内存泄漏
+    if (m_renderThread->seriesData.contains(name)) {
+        delete m_renderThread->seriesData[name].stats;
+    }
     DataSeries series;
     series.name = name;
     series.color = color;

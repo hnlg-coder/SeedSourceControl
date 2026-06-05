@@ -81,7 +81,7 @@ void DataTablePanel::addDataRow(const DeviceDataModel::RealTimeData& data)
     m_dataTable->insertRow(row);
     
     // 设置数据
-    m_dataTable->setItem(row, 0, new QTableWidgetItem(data.timestamp.toString("yyyy-MM-dd hh:mm:ss.zzz")));
+    m_dataTable->setItem(row, 0, new QTableWidgetItem(data.timestamp.toString("yyyy-MM-dd HH:mm:ss.zzz")));
     m_dataTable->setItem(row, 1, new QTableWidgetItem(QString::number(data.current, 'f', 2)));
     m_dataTable->setItem(row, 2, new QTableWidgetItem(QString::number(data.temperature, 'f', 2)));
     m_dataTable->setItem(row, 3, new QTableWidgetItem(QString::number(data.power, 'f', 2)));
@@ -114,7 +114,7 @@ void DataTablePanel::exportToCsv()
     QString fileName = QFileDialog::getSaveFileName(
         this, 
         "导出数据", 
-        QString("data_%1.csv").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss")),
+        QString("data_%1.csv").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")),
         "CSV Files (*.csv)");
     
     if (fileName.isEmpty()) {
