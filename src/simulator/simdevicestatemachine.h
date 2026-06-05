@@ -31,7 +31,6 @@ public:
 
     DeviceState currentState() const { return m_state; }
     bool isRunning() const { return m_state == Running; }
-    void setTargetCurrent(double current) { m_targetCurrent = current; }
 
     void startSimulation();
     void stopSimulation();
@@ -66,7 +65,6 @@ private:
     SimRegisterManager* m_regMgr;
     DeviceState m_state;
 
-    double m_targetCurrent;
     double m_currentReading;
     double m_temperatureReading;
     double m_powerReading;

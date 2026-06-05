@@ -57,6 +57,13 @@ MainWindow::MainWindow(QWidget* parent)
     , m_simNoise(nullptr)
     , m_simStartupDelay(nullptr)
     , m_simTempLag(nullptr)
+    , m_devDatecode(nullptr)
+    , m_devHwVer(nullptr)
+    , m_devFwVer(nullptr)
+    , m_devSerial(nullptr)
+    , m_devMaxCur(nullptr)
+    , m_devMaxTemp(nullptr)
+    , m_devMaxPower(nullptr)
 {
     setupUI();
     createMenus();
@@ -335,6 +342,10 @@ void MainWindow::onConnectClicked()
 
 void MainWindow::onDisconnectClicked()
 {
+    if (!m_connected) {
+        return;
+    }
+
     if (m_running) {
         onStopClicked();
     }
@@ -442,9 +453,13 @@ void MainWindow::onConnectionStateChanged(bool connected)
     m_connectionPanel->setConnected(connected);
 
     if (connected) {
-        QString portName = m_connectionPanel->selectedPort();
-        qint32 baudRate = m_connectionPanel->selectedBaudRate();
-        m_connectionStatusBar->setConnected(true, portName, baudRate);
+        if (m_simulationMode) {
+            m_connectionStatusBar->setConnected(true, tr("仿真模式"), 0);
+        } else {
+            QString portName = m_connectionPanel->selectedPort();
+            qint32 baudRate = m_connectionPanel->selectedBaudRate();
+            m_connectionStatusBar->setConnected(true, portName, baudRate);
+        }
         // 关闭抽屉
         m_connectionDrawer->setMaximumWidth(0);
         m_connectionDrawer->setFixedWidth(0);
@@ -548,6 +563,15 @@ void MainWindow::toggleSimulationMode()
         setupSimulationPanel();
     }
     m_simPanel->setVisible(m_simulationMode);
+
+    if (m_simulationMode) {
+        onConnectClicked();
+        updateSimulationDevinfo();
+    } else {
+        if (m_connected) {
+            onDisconnectClicked();
+        }
+    }
 }
 
 void MainWindow::setupSimulationPanel()
@@ -564,7 +588,7 @@ void MainWindow::setupSimulationPanel()
     QGridLayout* faultLayout = new QGridLayout(faultGroup);
 
     m_faultEnable = new QCheckBox(tr("启用故障注入"));
-    faultLayout->addWidget(m_faultEnable, 0, 0, 1, 2);
+    faultLayout->addWidget(m_faultEnable, 0, 0, 1, 3);
 
     faultLayout->addWidget(new QLabel(tr("丢帧率:")), 1, 0);
     m_faultDropRate = new QSlider(Qt::Horizontal);
@@ -573,6 +597,9 @@ void MainWindow::setupSimulationPanel()
     m_faultDropRate->setTickPosition(QSlider::TicksBelow);
     m_faultDropRate->setTickInterval(10);
     faultLayout->addWidget(m_faultDropRate, 1, 1);
+    QLabel* dropRateLabel = new QLabel("0 %");
+    dropRateLabel->setMinimumWidth(40);
+    faultLayout->addWidget(dropRateLabel, 1, 2);
 
     faultLayout->addWidget(new QLabel(tr("数据损坏率:")), 2, 0);
     m_faultCorruptRate = new QSlider(Qt::Horizontal);
@@ -581,6 +608,9 @@ void MainWindow::setupSimulationPanel()
     m_faultCorruptRate->setTickPosition(QSlider::TicksBelow);
     m_faultCorruptRate->setTickInterval(10);
     faultLayout->addWidget(m_faultCorruptRate, 2, 1);
+    QLabel* corruptRateLabel = new QLabel("0 %");
+    corruptRateLabel->setMinimumWidth(40);
+    faultLayout->addWidget(corruptRateLabel, 2, 2);
 
     faultLayout->addWidget(new QLabel(tr("响应延迟:")), 3, 0);
     m_faultDelay = new QSlider(Qt::Horizontal);
@@ -589,9 +619,12 @@ void MainWindow::setupSimulationPanel()
     m_faultDelay->setTickPosition(QSlider::TicksBelow);
     m_faultDelay->setTickInterval(50);
     faultLayout->addWidget(m_faultDelay, 3, 1);
+    QLabel* delayLabel = new QLabel("0 ms");
+    delayLabel->setMinimumWidth(50);
+    faultLayout->addWidget(delayLabel, 3, 2);
 
     m_faultCheckSum = new QCheckBox(tr("校验和错误"));
-    faultLayout->addWidget(m_faultCheckSum, 4, 0, 1, 2);
+    faultLayout->addWidget(m_faultCheckSum, 4, 0, 1, 3);
 
     panelLayout->addWidget(faultGroup);
 
@@ -605,6 +638,9 @@ void MainWindow::setupSimulationPanel()
     m_simSlewRate->setTickPosition(QSlider::TicksBelow);
     m_simSlewRate->setTickInterval(10);
     paramLayout->addWidget(m_simSlewRate, 0, 1);
+    QLabel* slewRateLabel = new QLabel("0.10");
+    slewRateLabel->setMinimumWidth(60);
+    paramLayout->addWidget(slewRateLabel, 0, 2);
 
     paramLayout->addWidget(new QLabel(tr("噪声幅值:")), 1, 0);
     m_simNoise = new QSlider(Qt::Horizontal);
@@ -613,6 +649,9 @@ void MainWindow::setupSimulationPanel()
     m_simNoise->setTickPosition(QSlider::TicksBelow);
     m_simNoise->setTickInterval(20);
     paramLayout->addWidget(m_simNoise, 1, 1);
+    QLabel* noiseLabel = new QLabel("0.020");
+    noiseLabel->setMinimumWidth(60);
+    paramLayout->addWidget(noiseLabel, 1, 2);
 
     paramLayout->addWidget(new QLabel(tr("启动延迟:")), 2, 0);
     m_simStartupDelay = new QSlider(Qt::Horizontal);
@@ -621,6 +660,9 @@ void MainWindow::setupSimulationPanel()
     m_simStartupDelay->setTickPosition(QSlider::TicksBelow);
     m_simStartupDelay->setTickInterval(1000);
     paramLayout->addWidget(m_simStartupDelay, 2, 1);
+    QLabel* startupDelayLabel = new QLabel("2000 ms");
+    startupDelayLabel->setMinimumWidth(70);
+    paramLayout->addWidget(startupDelayLabel, 2, 2);
 
     paramLayout->addWidget(new QLabel(tr("温度滞后:")), 3, 0);
     m_simTempLag = new QSlider(Qt::Horizontal);
@@ -629,8 +671,44 @@ void MainWindow::setupSimulationPanel()
     m_simTempLag->setTickPosition(QSlider::TicksBelow);
     m_simTempLag->setTickInterval(5);
     paramLayout->addWidget(m_simTempLag, 3, 1);
+    QLabel* tempLagLabel = new QLabel("0.05");
+    tempLagLabel->setMinimumWidth(60);
+    paramLayout->addWidget(tempLagLabel, 3, 2);
 
     panelLayout->addWidget(paramGroup);
+
+    QGroupBox* devinfoGroup = new QGroupBox(tr("模拟设备信息 (DEVINFO)"));
+    QGridLayout* devinfoLayout = new QGridLayout(devinfoGroup);
+
+    devinfoLayout->addWidget(new QLabel(tr("日期码:")), 0, 0);
+    m_devDatecode = new QLabel("---");
+    devinfoLayout->addWidget(m_devDatecode, 0, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("硬件版本:")), 1, 0);
+    m_devHwVer = new QLabel("---");
+    devinfoLayout->addWidget(m_devHwVer, 1, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("固件版本:")), 2, 0);
+    m_devFwVer = new QLabel("---");
+    devinfoLayout->addWidget(m_devFwVer, 2, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("序列号:")), 3, 0);
+    m_devSerial = new QLabel("---");
+    devinfoLayout->addWidget(m_devSerial, 3, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("最大电流:")), 4, 0);
+    m_devMaxCur = new QLabel("---");
+    devinfoLayout->addWidget(m_devMaxCur, 4, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("最高温度:")), 5, 0);
+    m_devMaxTemp = new QLabel("---");
+    devinfoLayout->addWidget(m_devMaxTemp, 5, 1);
+
+    devinfoLayout->addWidget(new QLabel(tr("最大功率:")), 6, 0);
+    m_devMaxPower = new QLabel("---");
+    devinfoLayout->addWidget(m_devMaxPower, 6, 1);
+
+    panelLayout->addWidget(devinfoGroup);
     panelLayout->addStretch();
 
     QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
@@ -647,19 +725,25 @@ void MainWindow::setupSimulationPanel()
             if (fi) fi->setEnabled(checked);
         }
     });
-    connect(m_faultDropRate, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_faultDropRate, &QSlider::valueChanged, this,
+            [this, dropRateLabel](int v) {
+        dropRateLabel->setText(QStringLiteral("%1 %").arg(v));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
             if (fi) fi->setDropRate(v / 100.0);
         }
     });
-    connect(m_faultCorruptRate, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_faultCorruptRate, &QSlider::valueChanged, this,
+            [this, corruptRateLabel](int v) {
+        corruptRateLabel->setText(QStringLiteral("%1 %").arg(v));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
             if (fi) fi->setCorruptRate(v / 100.0);
         }
     });
-    connect(m_faultDelay, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_faultDelay, &QSlider::valueChanged, this,
+            [this, delayLabel](int v) {
+        delayLabel->setText(tr("%1 ms").arg(v * 10));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
             if (fi) fi->setResponseDelay(v * 10);
@@ -671,28 +755,70 @@ void MainWindow::setupSimulationPanel()
             if (fi) fi->setWrongChecksum(checked);
         }
     });
-    connect(m_simSlewRate, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_simSlewRate, &QSlider::valueChanged, this,
+            [this, slewRateLabel](int v) {
+        slewRateLabel->setText(QString::number(v / 100.0, 'f', 2));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
             if (sm) sm->setCurrentSlewRate(v / 100.0);
         }
     });
-    connect(m_simNoise, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_simNoise, &QSlider::valueChanged, this,
+            [this, noiseLabel](int v) {
+        noiseLabel->setText(QString::number(v / 1000.0, 'f', 3));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
             if (sm) sm->setNoiseAmplitude(v / 1000.0);
         }
     });
-    connect(m_simStartupDelay, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_simStartupDelay, &QSlider::valueChanged, this,
+            [this, startupDelayLabel](int v) {
+        startupDelayLabel->setText(tr("%1 ms").arg(v));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
             if (sm) sm->setStartupDelayMs(v);
         }
     });
-    connect(m_simTempLag, &QSlider::valueChanged, this, [this](int v) {
+    connect(m_simTempLag, &QSlider::valueChanged, this,
+            [this, tempLagLabel](int v) {
+        tempLagLabel->setText(QString::number(v / 100.0, 'f', 2));
         if (m_simulationWorker && m_simulationWorker->isConnected()) {
             SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
             if (sm) sm->setTempResponseLag(v / 100.0);
         }
     });
+}
+
+void MainWindow::updateSimulationDevinfo()
+{
+    if (!m_simulationWorker || !m_simulationWorker->isConnected()) {
+        return;
+    }
+    SimulatorCore* core = m_simulationWorker->simulatorCore();
+    if (!core) {
+        return;
+    }
+
+    quint32 datecode = 0x20240101;
+    quint32 hwVer = 0x00010001;
+    quint32 fwVer = 0x00020001;
+    quint32 serial = 0x30303031;
+    quint32 maxCur = 0x0000012C;
+    quint32 maxTemp = 0x0000003C;
+    quint32 maxPower = 0x0000C350;
+
+    if (m_devDatecode) m_devDatecode->setText(QString("0x%1").arg(datecode, 8, 16, QChar('0')).toUpper());
+    if (m_devHwVer) m_devHwVer->setText(QString("v%1.%2").arg((hwVer >> 16) & 0xFFFF).arg(hwVer & 0xFFFF));
+    if (m_devFwVer) m_devFwVer->setText(QString("v%1.%2").arg((fwVer >> 16) & 0xFFFF).arg(fwVer & 0xFFFF));
+    if (m_devSerial) {
+        char s[5] = {0};
+        s[0] = (serial >> 24) & 0xFF;
+        s[1] = (serial >> 16) & 0xFF;
+        s[2] = (serial >> 8) & 0xFF;
+        s[3] = serial & 0xFF;
+        m_devSerial->setText(QString::fromLatin1(s, 4));
+    }
+    if (m_devMaxCur) m_devMaxCur->setText(tr("%1 mA").arg(maxCur));
+    if (m_devMaxTemp) m_devMaxTemp->setText(tr("%1 °C").arg(maxTemp));
+    if (m_devMaxPower) m_devMaxPower->setText(tr("%1 mW").arg(maxPower));
 }

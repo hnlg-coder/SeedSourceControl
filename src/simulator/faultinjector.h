@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QByteArray>
 #include <QRandomGenerator>
-#include <QTimer>
 
 class FaultInjector : public QObject {
     Q_OBJECT

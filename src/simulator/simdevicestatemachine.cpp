@@ -6,7 +6,6 @@ SimDeviceStateMachine::SimDeviceStateMachine(SimRegisterManager* regMgr, QObject
     : QObject(parent)
     , m_regMgr(regMgr)
     , m_state(Idle)
-    , m_targetCurrent(0)
     , m_currentReading(0)
     , m_temperatureReading(0)
     , m_powerReading(0)
@@ -56,6 +55,7 @@ void SimDeviceStateMachine::stop()
 {
     if (m_state == Running || m_state == Starting) {
         m_state = Stopping;
+        m_startTimestamp = QDateTime::currentMSecsSinceEpoch();
         writeStatusRegister(Stopping);
         emit logMessage(QStringLiteral("Device state: Stopping"));
     }
@@ -64,7 +64,6 @@ void SimDeviceStateMachine::stop()
 void SimDeviceStateMachine::reset()
 {
     m_state = Idle;
-    m_targetCurrent = 0;
     m_currentReading = 0;
     m_temperatureReading = 0;
     m_powerReading = 0;
@@ -88,7 +87,6 @@ void SimDeviceStateMachine::updateSimulation()
         qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_startTimestamp;
         if (elapsed >= 1500) {
             m_state = Idle;
-            m_targetCurrent = 0;
             m_currentReading = 0;
             m_temperatureReading = 0;
             m_powerReading = 0;

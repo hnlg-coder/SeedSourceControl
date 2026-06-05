@@ -122,10 +122,6 @@ bool SimProtocolHandler::handleWriteRegister(const QByteArray& data, QByteArray&
                    static_cast<quint32>(static_cast<quint8>(data[5]));
 
     if (m_registerManager->writeRegister(baseAddr, offset, value)) {
-        if (baseAddr == 0x02 && offset == 0x00) {
-            m_deviceState->setTargetCurrent(static_cast<double>(value));
-        }
-
         responseData.append(baseAddr);
         responseData.append(offset);
         responseData.append(static_cast<char>(0x00));

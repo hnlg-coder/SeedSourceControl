@@ -26,6 +26,8 @@ class CommunicationWorker;
 class SimulationWorker;
 class DeviceDataModel;
 class ICommand;
+class QLabel;
+class QGridLayout;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -60,6 +62,7 @@ private:
     void toggleDrawer();
     void toggleSimulationMode();
     void setupSimulationPanel();
+    void updateSimulationDevinfo();
     void sendCommand(QSharedPointer<ICommand> cmd);
     void onCommandCompleted(quint32 cmdId, bool success, QVariant result);
 
@@ -110,6 +113,14 @@ private:
     QSlider* m_simNoise;
     QSlider* m_simStartupDelay;
     QSlider* m_simTempLag;
+
+    QLabel* m_devDatecode;
+    QLabel* m_devHwVer;
+    QLabel* m_devFwVer;
+    QLabel* m_devSerial;
+    QLabel* m_devMaxCur;
+    QLabel* m_devMaxTemp;
+    QLabel* m_devMaxPower;
 };
 
 #endif // MAINWINDOW_H
