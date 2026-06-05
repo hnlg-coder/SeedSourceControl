@@ -6,7 +6,6 @@
 CommunicationWorker::CommunicationWorker(QObject* parent)
     : QThread(parent)
     , m_serialPort(nullptr)
-    , m_running(false)
     , m_connected(false)
     , m_state(Idle)
     , m_pollTimer(nullptr)
@@ -79,7 +78,6 @@ void CommunicationWorker::run()
     connect(this, &CommunicationWorker::disconnectRequested, this, &CommunicationWorker::doDisconnectDevice, Qt::QueuedConnection);
     connect(this, &CommunicationWorker::sendCommandRequested, this, &CommunicationWorker::doSendCommand, Qt::QueuedConnection);
 
-    m_running = true;
     m_threadFinished = false;
     m_pollTimer->start(10);
     m_connectionCheckTimer->start(5000);
@@ -123,8 +121,6 @@ void CommunicationWorker::startCommunication()
 
 void CommunicationWorker::stopCommunication()
 {
-    m_running = false;
-
     // 如果线程正在运行，请求断开并退出事件循环
     if (isRunning()) {
         emit disconnectRequested();
@@ -223,20 +219,12 @@ void CommunicationWorker::doSendCommand(QSharedPointer<ICommand> command)
 
 void CommunicationWorker::processCommandQueue()
 {
-    bool canProcess = false;
     {
-        QMutexLocker locker(&m_stateMutex);
-        canProcess = m_connected;
-    }
-    {
-        QMutexLocker locker(&m_pendingMutex);
-        if (m_state != Idle) {
-            canProcess = false;
+        QMutexLocker stateLocker(&m_stateMutex);
+        QMutexLocker pendingLocker(&m_pendingMutex);
+        if (!m_connected || m_state != Idle) {
+            return;
         }
-    }
-
-    if (!canProcess) {
-        return;
     }
 
     QSharedPointer<ICommand> command;
@@ -254,6 +242,8 @@ void CommunicationWorker::processCommandQueue()
         m_state = WaitingResponse;
     }
 
+    disconnect(command.data(), &ICommand::sendRequest, this, &CommunicationWorker::sendNextRequest);
+    disconnect(command.data(), &ICommand::completed, this, &CommunicationWorker::onCommandCompleted);
     connect(command.data(), &ICommand::sendRequest, this, &CommunicationWorker::sendNextRequest);
     connect(command.data(), &ICommand::completed, this, &CommunicationWorker::onCommandCompleted);
 

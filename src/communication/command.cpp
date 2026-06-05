@@ -25,7 +25,8 @@ void ICommand::execute()
     }
 
     setState(WaitingResponse);
-    m_timeoutTimer->start(static_cast<int>(timeout()));
+    QMetaObject::invokeMethod(m_timeoutTimer, "start", Qt::QueuedConnection,
+                              Q_ARG(int, static_cast<int>(timeout())));
     emit sendRequest(request);
 }
 

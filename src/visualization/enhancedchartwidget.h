@@ -68,7 +68,7 @@ public:
     /**
      * @brief 获取指定系列的统计计算器
      */
-    StatisticsCalculator* statistics(const QString& seriesName);
+    StatisticsResult statistics(const QString& seriesName);
 
     /**
      * @brief 设置系列可见性

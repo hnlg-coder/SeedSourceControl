@@ -373,14 +373,14 @@ void EnhancedChartWidget::setShowStatistics(bool enabled)
     m_renderThread->showStatistics = enabled;
 }
 
-StatisticsCalculator* EnhancedChartWidget::statistics(const QString& seriesName)
+StatisticsResult EnhancedChartWidget::statistics(const QString& seriesName)
 {
     QMutexLocker locker(&m_renderThread->dataMutex);
     auto it = m_renderThread->seriesData.find(seriesName);
-    if (it != m_renderThread->seriesData.end()) {
-        return it->stats;
+    if (it != m_renderThread->seriesData.end() && it->stats) {
+        return it->stats->result();
     }
-    return nullptr;
+    return StatisticsResult();
 }
 
 void EnhancedChartWidget::setSeriesVisible(const QString& name, bool visible)

@@ -29,7 +29,6 @@ struct StatisticsResult {
  * @brief 统计计算器类
  *
  * 线程安全的滑动窗口统计计算器，支持实时更新
- * 使用Welford在线算法计算均值和方差，避免数值溢出
  */
 class StatisticsCalculator : public QObject {
     Q_OBJECT
@@ -71,17 +70,11 @@ signals:
     void statisticsUpdated(const StatisticsResult& result);
 
 private:
-    void recalculate();
-
     QVector<double> m_values;
     QVector<QDateTime> m_timestamps;
     int m_windowSize;
     mutable QReadWriteLock m_lock;
 
-    // Welford在线算法状态
-    double m_mean;
-    double m_m2;        // Welford M2统计量
-    int m_count;
     double m_min;
     double m_max;
 };

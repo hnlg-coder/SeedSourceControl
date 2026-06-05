@@ -3,9 +3,6 @@
 StatisticsCalculator::StatisticsCalculator(int windowSize, QObject* parent)
     : QObject(parent)
     , m_windowSize(windowSize)
-    , m_mean(0.0)
-    , m_m2(0.0)
-    , m_count(0)
     , m_min(0.0)
     , m_max(0.0)
 {
@@ -85,9 +82,6 @@ void StatisticsCalculator::clear()
     QWriteLocker locker(&m_lock);
     m_values.clear();
     m_timestamps.clear();
-    m_mean = 0.0;
-    m_m2 = 0.0;
-    m_count = 0;
     m_min = 0.0;
     m_max = 0.0;
 }
@@ -100,33 +94,4 @@ void StatisticsCalculator::setWindowSize(int size)
         m_values.removeFirst();
         m_timestamps.removeFirst();
     }
-}
-
-void StatisticsCalculator::recalculate()
-{
-    // 内部调用，调用方已持有写锁
-    m_count = m_values.size();
-    if (m_count == 0) {
-        m_mean = 0; m_m2 = 0; m_min = 0; m_max = 0;
-        return;
-    }
-
-    double sum = 0.0;
-    m_min = m_values[0];
-    m_max = m_values[0];
-
-    for (double v : m_values) {
-        sum += v;
-        if (v < m_min) m_min = v;
-        if (v > m_max) m_max = v;
-    }
-
-    m_mean = sum / m_count;
-
-    double sumSq = 0.0;
-    for (double v : m_values) {
-        double d = v - m_mean;
-        sumSq += d * d;
-    }
-    m_m2 = sumSq;
 }

@@ -192,7 +192,6 @@ private:
     mutable QMutex m_stateMutex;                // 状态互斥锁（保护m_connected和m_state）
     QMutex m_configMutex;                        // 配置互斥锁（保护串口配置参数）
 
-    bool m_running;            // 是否运行中
     bool m_connected;          // 是否连接
     CommunicationState m_state;  // 通信状态
     QTimer* m_pollTimer;      // 轮询定时器
