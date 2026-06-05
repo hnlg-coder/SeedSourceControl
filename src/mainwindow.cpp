@@ -39,12 +39,12 @@ MainWindow::MainWindow(QWidget* parent)
 {
     setupUI();
     createMenus();
-    createToolbar();
     initializeComponents();
     connectSignals();
 
     setWindowTitle(tr("种子源模块控制器 - v2.0"));
     resize(1280, 900);
+    setMinimumSize(800, 600);
 }
 
 MainWindow::~MainWindow()
@@ -123,7 +123,8 @@ void MainWindow::setupUI()
 
     // === 底部：日志面板 ===
     m_logPanel = new LogPanel();
-    m_logPanel->setMaximumHeight(150);
+    m_logPanel->setMinimumHeight(80);
+    m_logPanel->setMaximumHeight(200);
     mainLayout->addWidget(m_logPanel);
 
     // 状态栏
@@ -146,27 +147,6 @@ void MainWindow::createMenus()
         QMessageBox::about(this, tr("关于"), tr("种子源模块控制器 v2.0\n基于Qt框架开发\n支持协议V1.3全寄存器数据展示"));
     });
     helpMenu->addAction(aboutAction);
-}
-
-void MainWindow::createToolbar()
-{
-    QToolBar* toolBar = addToolBar(tr("主工具栏"));
-
-    QAction* connectAction = new QAction(tr("连接"), this);
-    QAction* disconnectAction = new QAction(tr("断开"), this);
-    QAction* startAction = new QAction(tr("启动"), this);
-    QAction* stopAction = new QAction(tr("停止"), this);
-
-    toolBar->addAction(connectAction);
-    toolBar->addAction(disconnectAction);
-    toolBar->addSeparator();
-    toolBar->addAction(startAction);
-    toolBar->addAction(stopAction);
-
-    connect(connectAction, &QAction::triggered, this, &MainWindow::onConnectClicked);
-    connect(disconnectAction, &QAction::triggered, this, &MainWindow::onDisconnectClicked);
-    connect(startAction, &QAction::triggered, this, &MainWindow::onStartClicked);
-    connect(stopAction, &QAction::triggered, this, &MainWindow::onStopClicked);
 }
 
 void MainWindow::initializeComponents()

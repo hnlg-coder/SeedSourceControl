@@ -48,7 +48,6 @@ private slots:
 private:
     void setupUI();
     void createMenus();
-    void createToolbar();
     void connectSignals();
     void initializeComponents();
 

@@ -102,11 +102,19 @@ void ConnectionPanel::setupUI()
         "  font-size: 11px;"
         "}"
         "QComboBox::drop-down {"
-        "  width: 0px;"
-        "  border: none;"
+        "  subcontrol-origin: padding;"
+        "  subcontrol-position: top right;"
+        "  width: 18px;"
+        "  border-left: 1px solid #ccc;"
+        "  border-top-right-radius: 2px;"
+        "  border-bottom-right-radius: 2px;"
         "}"
         "QComboBox::down-arrow {"
-        "  image: none;"
+        "  width: 0px;"
+        "  height: 0px;"
+        "  border-left: 4px solid transparent;"
+        "  border-right: 4px solid transparent;"
+        "  border-top: 6px solid #555;"
         "}";
 
     m_portCombo = new QComboBox();
