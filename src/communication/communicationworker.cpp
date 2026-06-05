@@ -214,7 +214,7 @@ void CommunicationWorker::doSendCommand(QSharedPointer<ICommand> command)
 {
     QMutexLocker locker(&m_queueMutex);
     m_commandQueue.enqueue(command);
-    emit logMessage(QString("Command %1 queued").arg(command->id()));
+    emit logMessage(QString("排队: %1").arg(command->description()));
 }
 
 void CommunicationWorker::processCommandQueue()
@@ -248,7 +248,7 @@ void CommunicationWorker::processCommandQueue()
     connect(command.data(), &ICommand::completed, this, &CommunicationWorker::onCommandCompleted);
 
     command->execute();
-    emit logMessage(QString("Command %1 executing").arg(command->id()));
+    emit logMessage(QString("执行: %1").arg(command->description()));
 }
 
 void CommunicationWorker::sendNextRequest(const QByteArray& request)
@@ -258,10 +258,13 @@ void CommunicationWorker::sendNextRequest(const QByteArray& request)
         m_serialPort->flush();
 
         QString hexStr;
-        for (int i = 0; i < request.size(); ++i) {
-            hexStr += QString("%1 ").arg(static_cast<quint8>(request[i]), 2, 16, QChar('0'));
-        }
-        emit logMessage(QString("TX: %1").arg(hexStr));
+    for (int i = 0; i < request.size(); ++i) {
+        hexStr += QString("%1 ").arg(static_cast<quint8>(request[i]), 2, 16, QChar('0'));
+    }
+
+    ICommand* cmd = qobject_cast<ICommand*>(sender());
+    QString desc = cmd ? cmd->description() : QString("未知命令");
+    emit logMessage(QString("发送: %1 [%2]").arg(desc).arg(hexStr.trimmed()));
     }
 }
 
@@ -279,7 +282,7 @@ void CommunicationWorker::onSerialDataReady()
     for (int i = 0; i < data.size(); ++i) {
         hexStr += QString("%1 ").arg(static_cast<quint8>(data[i]), 2, 16, QChar('0'));
     }
-    emit logMessage(QString("RX: %1").arg(hexStr));
+    emit logMessage(QString("接收: %1").arg(hexStr.trimmed()));
 
     processReceivedData();
 }
@@ -375,8 +378,14 @@ void CommunicationWorker::onCommandCompleted(bool success, const QVariant& resul
             m_state = Idle;
         }
 
+        QString desc = command->description();
+        if (success) {
+            emit logMessage(QString("成功: %1").arg(desc));
+        } else {
+            QString err = command->errorString();
+            emit logMessage(QString("失败: %1 - %2").arg(desc).arg(err));
+        }
         emit commandCompleted(cmdId, success, result);
-        emit logMessage(QString("Command %1 completed: %2").arg(cmdId).arg(success ? "success" : "failed"));
     }
 }
 

@@ -125,6 +125,13 @@ bool ReadRegisterCommand::parseResponse(const QByteArray& response)
     return false;
 }
 
+QString ReadRegisterCommand::description() const
+{
+    return QString("读取寄存器(基址=0x%1, 偏移=0x%2)")
+        .arg(m_baseAddr, 2, 16, QChar('0'))
+        .arg(m_offset, 2, 16, QChar('0'));
+}
+
 WriteRegisterCommand::WriteRegisterCommand(quint8 baseAddr, quint8 offset, quint32 value, IProtocolParser* parser, QObject* parent)
     : ICommand(parent)
     , m_baseAddr(baseAddr)
@@ -151,6 +158,14 @@ bool WriteRegisterCommand::parseResponse(const QByteArray& response)
         return true;
     }
     return false;
+}
+
+QString WriteRegisterCommand::description() const
+{
+    return QString("写入寄存器(基址=0x%1, 偏移=0x%2, 值=0x%3)")
+        .arg(m_baseAddr, 2, 16, QChar('0'))
+        .arg(m_offset, 2, 16, QChar('0'))
+        .arg(m_value, 8, 16, QChar('0'));
 }
 
 ReadStatusCommand::ReadStatusCommand(IProtocolParser* parser, QObject* parent)
@@ -203,6 +218,11 @@ bool ReadStatusCommand::parseResponse(const QByteArray& response)
     return false;
 }
 
+QString ReadStatusCommand::description() const
+{
+    return QString("读取状态寄存器(status/报警/电流/温度/功率)");
+}
+
 ControlDeviceCommand::ControlDeviceCommand(ControlAction action, IProtocolParser* parser, QObject* parent)
     : ICommand(parent)
     , m_action(action)
@@ -232,6 +252,18 @@ bool ControlDeviceCommand::parseResponse(const QByteArray& response)
         return true;
     }
     return false;
+}
+
+QString ControlDeviceCommand::description() const
+{
+    QString name;
+    switch (m_action) {
+        case Start:     name = QString("启动设备"); break;
+        case Stop:      name = QString("停止设备"); break;
+        case Reset:     name = QString("复位设备"); break;
+        case Calibrate: name = QString("校准设备"); break;
+    }
+    return QString("控制命令: %1").arg(name);
 }
 
 QSharedPointer<ICommand> CommandFactory::createReadRegisterCommand(quint8 baseAddr, quint8 offset, IProtocolParser* parser)

@@ -29,6 +29,7 @@ public:
 
     virtual QByteArray buildRequest() = 0;
     virtual bool parseResponse(const QByteArray& response) = 0;
+    virtual QString description() const = 0;
 
     virtual quint32 timeout() const { return 2000; }
     virtual int priority() const { return 0; }
@@ -70,6 +71,7 @@ public:
 
     QByteArray buildRequest() override;
     bool parseResponse(const QByteArray& response) override;
+    QString description() const override;
 
 private:
     quint8 m_baseAddr;
@@ -84,6 +86,7 @@ public:
 
     QByteArray buildRequest() override;
     bool parseResponse(const QByteArray& response) override;
+    QString description() const override;
 
 private:
     quint8 m_baseAddr;
@@ -99,6 +102,7 @@ public:
 
     QByteArray buildRequest() override;
     bool parseResponse(const QByteArray& response) override;
+    QString description() const override;
 
 private:
     IProtocolParser* m_parser;
@@ -118,6 +122,7 @@ public:
 
     QByteArray buildRequest() override;
     bool parseResponse(const QByteArray& response) override;
+    QString description() const override;
 
 private:
     ControlAction m_action;
