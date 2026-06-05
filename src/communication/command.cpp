@@ -35,7 +35,11 @@ void ICommand::onResponse(const QByteArray& response)
     CommandState expected = WaitingResponse;
     if (!m_state.compare_exchange_strong(expected, Processing,
             std::memory_order_acq_rel, std::memory_order_acquire)) {
-        return;
+        expected = Pending;
+        if (!m_state.compare_exchange_strong(expected, Processing,
+                std::memory_order_acq_rel, std::memory_order_acquire)) {
+            return;
+        }
     }
 
     m_timeoutTimer->stop();
