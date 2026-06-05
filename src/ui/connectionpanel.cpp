@@ -46,9 +46,9 @@ void ConnectionPanel::setConnected(bool connected)
     m_connected = connected;
     
     if (connected) {
-        m_connectButton->setText("Disconnect");
-        m_statusLabel->setText("Connected");
-        m_statusLabel->setStyleSheet("color: green; font-weight: bold; font-size: 11px;");
+        m_connectButton->setText(tr("断开"));
+        m_statusLabel->setText(tr("已连接"));
+        m_statusLabel->setStyleSheet("color: green; font-weight: bold; font-size: 11px; padding: 2px;");
         m_portCombo->setEnabled(false);
         m_baudRateCombo->setEnabled(false);
         m_dataBitsCombo->setEnabled(false);
@@ -56,9 +56,9 @@ void ConnectionPanel::setConnected(bool connected)
         m_stopBitsCombo->setEnabled(false);
         m_flowControlCombo->setEnabled(false);
     } else {
-        m_connectButton->setText("Connect");
-        m_statusLabel->setText("Disconnected");
-        m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px;");
+        m_connectButton->setText(tr("连接"));
+        m_statusLabel->setText(tr("已断开"));
+        m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px; padding: 2px;");
         m_portCombo->setEnabled(true);
         m_baudRateCombo->setEnabled(true);
         m_dataBitsCombo->setEnabled(true);
@@ -88,17 +88,17 @@ void ConnectionPanel::onConnectButtonClicked()
 
 void ConnectionPanel::setupUI()
 {
-    QHBoxLayout* mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(4, 2, 4, 2);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(6, 6, 6, 6);
     mainLayout->setSpacing(4);
 
     QString comboStyle =
         "QComboBox {"
         "  border: 1px solid #ccc;"
         "  border-radius: 2px;"
-        "  padding: 1px 4px;"
+        "  padding: 2px 4px;"
         "  background: white;"
-        "  min-height: 18px;"
+        "  min-height: 20px;"
         "  font-size: 11px;"
         "}"
         "QComboBox::drop-down {"
@@ -137,40 +137,43 @@ void ConnectionPanel::setupUI()
     populateStopBits();
     populateFlowControl();
 
-    m_portCombo->setMinimumWidth(80);
-    m_baudRateCombo->setMinimumWidth(80);
-    m_dataBitsCombo->setMinimumWidth(50);
-    m_parityCombo->setMinimumWidth(60);
-    m_stopBitsCombo->setMinimumWidth(50);
-    m_flowControlCombo->setMinimumWidth(70);
+    m_portCombo->setMinimumWidth(130);
+    m_baudRateCombo->setMinimumWidth(130);
+    m_dataBitsCombo->setMinimumWidth(130);
+    m_parityCombo->setMinimumWidth(130);
+    m_stopBitsCombo->setMinimumWidth(130);
+    m_flowControlCombo->setMinimumWidth(130);
 
-    mainLayout->addWidget(new QLabel("Port:"));
-    mainLayout->addWidget(m_portCombo);
-    mainLayout->addWidget(new QLabel("Baud:"));
-    mainLayout->addWidget(m_baudRateCombo);
-    mainLayout->addWidget(new QLabel("Data:"));
-    mainLayout->addWidget(m_dataBitsCombo);
-    mainLayout->addWidget(new QLabel("Parity:"));
-    mainLayout->addWidget(m_parityCombo);
-    mainLayout->addWidget(new QLabel("Stop:"));
-    mainLayout->addWidget(m_stopBitsCombo);
-    mainLayout->addWidget(new QLabel("Flow:"));
-    mainLayout->addWidget(m_flowControlCombo);
+    QFormLayout* formLayout = new QFormLayout();
+    formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    formLayout->setSpacing(3);
+    formLayout->addRow(tr("串口:"), m_portCombo);
+    formLayout->addRow(tr("波特率:"), m_baudRateCombo);
+    formLayout->addRow(tr("数据位:"), m_dataBitsCombo);
+    formLayout->addRow(tr("校验位:"), m_parityCombo);
+    formLayout->addRow(tr("停止位:"), m_stopBitsCombo);
+    formLayout->addRow(tr("流控制:"), m_flowControlCombo);
+    mainLayout->addLayout(formLayout);
 
-    mainLayout->addSpacing(8);
+    mainLayout->addSpacing(4);
 
-    m_connectButton = new QPushButton("Connect");
-    m_refreshButton = new QPushButton("Refresh");
-    m_connectButton->setFixedHeight(24);
-    m_refreshButton->setFixedHeight(24);
+    m_connectButton = new QPushButton(tr("连接"));
+    m_refreshButton = new QPushButton(tr("刷新"));
+    m_connectButton->setFixedHeight(26);
+    m_refreshButton->setFixedHeight(26);
 
-    mainLayout->addWidget(m_refreshButton);
-    mainLayout->addWidget(m_connectButton);
+    QHBoxLayout* btnLayout = new QHBoxLayout();
+    btnLayout->addWidget(m_refreshButton);
+    btnLayout->addWidget(m_connectButton);
+    btnLayout->addStretch();
+    mainLayout->addLayout(btnLayout);
 
-    m_statusLabel = new QLabel("Disconnected");
-    m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px;");
+    mainLayout->addSpacing(2);
 
+    m_statusLabel = new QLabel(tr("已断开"));
+    m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px; padding: 2px;");
     mainLayout->addWidget(m_statusLabel);
+
     mainLayout->addStretch();
 
     connect(m_refreshButton, &QPushButton::clicked, this, &ConnectionPanel::refreshPorts);

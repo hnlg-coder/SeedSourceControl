@@ -4,10 +4,11 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QTabWidget>
+#include <QPropertyAnimation>
 #include <atomic>
 
-// Forward declarations
 class ConnectionPanel;
+class ConnectionStatusBar;
 class LogPanel;
 class DashboardWidget;
 class CurrentControlWidget;
@@ -50,8 +51,11 @@ private:
     void createMenus();
     void connectSignals();
     void initializeComponents();
+    void toggleDrawer();
 
-    // 顶部串口配置
+    ConnectionStatusBar* m_connectionStatusBar;
+    QWidget* m_connectionDrawer;
+    QPropertyAnimation* m_drawerAnimation;
     ConnectionPanel* m_connectionPanel;
 
     // 页签容器

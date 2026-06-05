@@ -38,6 +38,8 @@ set(SOURCES
     
     src/ui/connectionpanel.h
     src/ui/connectionpanel.cpp
+    src/ui/connectionstatusbar.h
+    src/ui/connectionstatusbar.cpp
     src/ui/statuspanel.h
     src/ui/statuspanel.cpp
     src/ui/controlpanel.h
@@ -89,6 +91,7 @@ set(HEADERS
     src/visualization/statisticscalculator.h
     
     src/ui/connectionpanel.h
+    src/ui/connectionstatusbar.h
     src/ui/statuspanel.h
     src/ui/controlpanel.h
     src/ui/realtimeplotpanel.h

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui/connectionpanel.h"
+#include "ui/connectionstatusbar.h"
 #include "ui/logpanel.h"
 #include "ui/dashboardwidget.h"
 #include "ui/currentcontrolwidget.h"
@@ -25,6 +26,10 @@
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
+    , m_connectionStatusBar(nullptr)
+    , m_connectionDrawer(nullptr)
+    , m_drawerAnimation(nullptr)
+    , m_connectionPanel(nullptr)
     , m_tabWidget(nullptr)
     , m_dashboardWidget(nullptr)
     , m_currentControlWidget(nullptr)
@@ -75,41 +80,56 @@ void MainWindow::setupUI()
     setCentralWidget(centralWidget);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(4, 4, 4, 4);
-    mainLayout->setSpacing(2);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
 
-    // === 顶部：串口连接面板 ===
+    // === 顶部：连接状态条 ===
+    m_connectionStatusBar = new ConnectionStatusBar();
+    mainLayout->addWidget(m_connectionStatusBar);
+
+    // === 中间：抽屉面板 + Tab功能区 ===
+    QHBoxLayout* bodyLayout = new QHBoxLayout();
+    bodyLayout->setContentsMargins(2, 2, 2, 2);
+    bodyLayout->setSpacing(0);
+
+    // 左侧抽屉面板（默认收起）
+    m_connectionDrawer = new QWidget();
+    m_connectionDrawer->setObjectName("connectionDrawer");
+    m_connectionDrawer->setFixedWidth(0);
+    m_connectionDrawer->setMaximumWidth(0);
+    m_connectionDrawer->setStyleSheet(
+        "QWidget#connectionDrawer { background: #f8f9fa; border-right: 1px solid #dee2e6; }");
+
+    QVBoxLayout* drawerLayout = new QVBoxLayout(m_connectionDrawer);
+    drawerLayout->setContentsMargins(0, 0, 0, 0);
+    drawerLayout->setSpacing(0);
+
     m_connectionPanel = new ConnectionPanel();
-    mainLayout->addWidget(m_connectionPanel);
+    drawerLayout->addWidget(m_connectionPanel);
 
-    // === 中间：QTabWidget 功能页签 ===
+    bodyLayout->addWidget(m_connectionDrawer);
+
+    // 右侧 Tab 功能区
     m_tabWidget = new QTabWidget();
 
-    // 页签1: 总览
     m_dashboardWidget = new DashboardWidget();
     m_tabWidget->addTab(m_dashboardWidget, tr("总览"));
 
-    // 页签2: 电流控制
     m_currentControlWidget = new CurrentControlWidget();
     m_tabWidget->addTab(m_currentControlWidget, tr("电流控制"));
 
-    // 页签3: 温度控制
     m_temperatureControlWidget = new TemperatureControlWidget();
     m_tabWidget->addTab(m_temperatureControlWidget, tr("温度控制"));
 
-    // 页签4: 功率监测
     m_monitorWidget = new MonitorWidget();
     m_tabWidget->addTab(m_monitorWidget, tr("功率监测"));
 
-    // 页签5: 设备配置
     m_configWidget = new ConfigWidget();
     m_tabWidget->addTab(m_configWidget, tr("设备配置"));
 
-    // 页签6: 报警管理
     m_alertWidget = new AlertWidget();
     m_tabWidget->addTab(m_alertWidget, tr("报警管理"));
 
-    // 页签7: 数据统计（DataTablePanel + 统计信息）
     m_statisticsTab = new QWidget();
     QVBoxLayout* statLayout = new QVBoxLayout(m_statisticsTab);
     QLabel* statHeaderLabel = new QLabel(tr("数据统计 - 历史数据记录与导出"));
@@ -119,14 +139,19 @@ void MainWindow::setupUI()
     statLayout->addWidget(m_dataTablePanel);
     m_tabWidget->addTab(m_statisticsTab, tr("数据统计"));
 
-    mainLayout->addWidget(m_tabWidget, 1);
+    bodyLayout->addWidget(m_tabWidget, 1);
+    mainLayout->addLayout(bodyLayout, 1);
+
+    // 抽屉动画
+    m_drawerAnimation = new QPropertyAnimation(m_connectionDrawer, "maximumWidth", this);
+    m_drawerAnimation->setDuration(200);
+    m_drawerAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
     // 日志面板：创建后添加到总览页签
     m_logPanel = new LogPanel();
     m_logPanel->setMinimumHeight(120);
     m_dashboardWidget->setLogPanel(m_logPanel);
 
-    // 状态栏
     statusBar()->showMessage(tr("就绪"));
 }
 
@@ -172,6 +197,12 @@ void MainWindow::connectSignals()
     // 连接面板信号
     connect(m_connectionPanel, &ConnectionPanel::connectClicked, this, &MainWindow::onConnectClicked);
     connect(m_connectionPanel, &ConnectionPanel::disconnectClicked, this, &MainWindow::onDisconnectClicked);
+
+    // 状态条 - 配置/断开按钮
+    connect(m_connectionStatusBar, &ConnectionStatusBar::configToggled,
+            this, &MainWindow::toggleDrawer);
+    connect(m_connectionStatusBar, &ConnectionStatusBar::disconnectClicked,
+            this, &MainWindow::onDisconnectClicked);
 
     // 总览页签 - 启停控制
     connect(m_dashboardWidget, &DashboardWidget::startClicked, this, &MainWindow::onStartClicked);
@@ -266,6 +297,7 @@ void MainWindow::onConnectClicked()
     m_communicationWorker->startCommunication();
     m_communicationWorker->connectDevice();
 
+    m_connectionStatusBar->setConnected(false);
     m_logPanel->logMessage(tr("尝试连接设备: %1, 波特率: %2").arg(portName).arg(baudRate), LogPanel::Info);
 }
 
@@ -374,9 +406,21 @@ void MainWindow::onConnectionStateChanged(bool connected)
     m_connectionPanel->setConnected(connected);
 
     if (connected) {
+        QString portName = m_connectionPanel->selectedPort();
+        qint32 baudRate = m_connectionPanel->selectedBaudRate();
+        m_connectionStatusBar->setConnected(true, portName, baudRate);
+        // 关闭抽屉
+        m_connectionDrawer->setMaximumWidth(0);
+        m_connectionDrawer->setFixedWidth(0);
         m_logPanel->logMessage(tr("设备已连接"), LogPanel::Info);
         statusBar()->showMessage(tr("已连接"));
     } else {
+        m_connectionStatusBar->setConnected(false);
+        // 自动展开抽屉，方便重新配置
+        m_connectionDrawer->setFixedWidth(220);
+        m_drawerAnimation->setStartValue(0);
+        m_drawerAnimation->setEndValue(220);
+        m_drawerAnimation->start();
         m_logPanel->logMessage(tr("设备已断开"), LogPanel::Warning);
         statusBar()->showMessage(tr("已断开"));
         m_running = false;
@@ -397,6 +441,21 @@ void MainWindow::onDataUpdated()
 void MainWindow::onAlarmTriggered(quint32 alarmCode, const QString& message)
 {
     // 此方法已通过 lambda 连接处理，保留用于兼容
+}
+
+void MainWindow::toggleDrawer()
+{
+    int drawerWidth = 220;
+    if (m_connectionDrawer->maximumWidth() > 0) {
+        m_drawerAnimation->setStartValue(drawerWidth);
+        m_drawerAnimation->setEndValue(0);
+        m_drawerAnimation->start();
+    } else {
+        m_connectionDrawer->setFixedWidth(drawerWidth);
+        m_drawerAnimation->setStartValue(0);
+        m_drawerAnimation->setEndValue(drawerWidth);
+        m_drawerAnimation->start();
+    }
 }
 
 void MainWindow::pollDevice()
