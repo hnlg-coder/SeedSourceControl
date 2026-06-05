@@ -108,3 +108,16 @@ void SimulatorCore::onStateDataUpdated(double current, double temperature, doubl
     m_powerReading = power;
     emit dataUpdated(current, temperature, power);
 }
+
+quint32 SimulatorCore::readRawRegister(quint8 baseAddr, quint8 offset) const
+{
+    if (!m_regMgr) return 0;
+    return m_regMgr->readRaw(baseAddr, offset);
+}
+
+void SimulatorCore::writeRawRegister(quint8 baseAddr, quint8 offset, quint32 value)
+{
+    if (m_regMgr) {
+        m_regMgr->writeRaw(baseAddr, offset, value);
+    }
+}

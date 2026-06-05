@@ -680,32 +680,45 @@ void MainWindow::setupSimulationPanel()
     QGroupBox* devinfoGroup = new QGroupBox(tr("模拟设备信息 (DEVINFO)"));
     QGridLayout* devinfoLayout = new QGridLayout(devinfoGroup);
 
-    devinfoLayout->addWidget(new QLabel(tr("日期码:")), 0, 0);
-    m_devDatecode = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("日期码 (0x07:00):")), 0, 0);
+    m_devDatecode = new QLabel("0x20240101");
     devinfoLayout->addWidget(m_devDatecode, 0, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("硬件版本:")), 1, 0);
-    m_devHwVer = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("硬件版本 (Hi.Lo):")), 1, 0);
+    m_devHwVer = new QLineEdit("1.1");
+    m_devHwVer->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devHwVer, 1, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("固件版本:")), 2, 0);
-    m_devFwVer = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("固件版本 (Hi.Lo):")), 2, 0);
+    m_devFwVer = new QLineEdit("2.1");
+    m_devFwVer->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devFwVer, 2, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("序列号:")), 3, 0);
-    m_devSerial = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("序列号 (4 ASCII):")), 3, 0);
+    m_devSerial = new QLineEdit("0001");
+    m_devSerial->setMaxLength(4);
+    m_devSerial->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devSerial, 3, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("最大电流:")), 4, 0);
-    m_devMaxCur = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("最大电流 (mA):")), 4, 0);
+    m_devMaxCur = new QSpinBox();
+    m_devMaxCur->setRange(0, 10000);
+    m_devMaxCur->setValue(300);
+    m_devMaxCur->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devMaxCur, 4, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("最高温度:")), 5, 0);
-    m_devMaxTemp = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("最高温度 (°C):")), 5, 0);
+    m_devMaxTemp = new QSpinBox();
+    m_devMaxTemp->setRange(0, 255);
+    m_devMaxTemp->setValue(60);
+    m_devMaxTemp->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devMaxTemp, 5, 1);
 
-    devinfoLayout->addWidget(new QLabel(tr("最大功率:")), 6, 0);
-    m_devMaxPower = new QLabel("---");
+    devinfoLayout->addWidget(new QLabel(tr("最大功率 (mW):")), 6, 0);
+    m_devMaxPower = new QSpinBox();
+    m_devMaxPower->setRange(0, 999999);
+    m_devMaxPower->setValue(50000);
+    m_devMaxPower->setMaximumWidth(80);
     devinfoLayout->addWidget(m_devMaxPower, 6, 1);
 
     panelLayout->addWidget(devinfoGroup);
@@ -787,6 +800,62 @@ void MainWindow::setupSimulationPanel()
             if (sm) sm->setTempResponseLag(v / 100.0);
         }
     });
+    connect(m_devHwVer, &QLineEdit::editingFinished, this, [this]() {
+        writeSimulationDevinfo();
+    });
+    connect(m_devFwVer, &QLineEdit::editingFinished, this, [this]() {
+        writeSimulationDevinfo();
+    });
+    connect(m_devSerial, &QLineEdit::editingFinished, this, [this]() {
+        writeSimulationDevinfo();
+    });
+    connect(m_devMaxCur, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
+        writeSimulationDevinfo();
+    });
+    connect(m_devMaxTemp, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
+        writeSimulationDevinfo();
+    });
+    connect(m_devMaxPower, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
+        writeSimulationDevinfo();
+    });
+}
+
+void MainWindow::writeSimulationDevinfo()
+{
+    if (!m_simulationWorker || !m_simulationWorker->isConnected()) {
+        return;
+    }
+    SimulatorCore* core = m_simulationWorker->simulatorCore();
+    if (!core) {
+        return;
+    }
+
+    QStringList hwParts = m_devHwVer->text().split('.');
+    if (hwParts.size() == 2) {
+        quint32 hwVal = (hwParts[0].toUInt() << 16) | hwParts[1].toUInt();
+        core->writeRawRegister(0x07, 0x01, hwVal);
+    }
+
+    QStringList fwParts = m_devFwVer->text().split('.');
+    if (fwParts.size() == 2) {
+        quint32 fwVal = (fwParts[0].toUInt() << 16) | fwParts[1].toUInt();
+        core->writeRawRegister(0x07, 0x02, fwVal);
+    }
+
+    QString serial = m_devSerial->text().left(4);
+    QByteArray serialBytes = serial.toLatin1();
+    while (serialBytes.size() < 4) {
+        serialBytes.append('\0');
+    }
+    quint32 serialVal = (static_cast<quint8>(serialBytes[0]) << 24) |
+                         (static_cast<quint8>(serialBytes[1]) << 16) |
+                         (static_cast<quint8>(serialBytes[2]) << 8) |
+                         static_cast<quint8>(serialBytes[3]);
+    core->writeRawRegister(0x07, 0x03, serialVal);
+
+    core->writeRawRegister(0x07, 0x06, static_cast<quint32>(m_devMaxCur->value()));
+    core->writeRawRegister(0x07, 0x07, static_cast<quint32>(m_devMaxTemp->value()));
+    core->writeRawRegister(0x07, 0x08, static_cast<quint32>(m_devMaxPower->value()));
 }
 
 void MainWindow::updateSimulationDevinfo()
@@ -799,17 +868,17 @@ void MainWindow::updateSimulationDevinfo()
         return;
     }
 
-    quint32 datecode = 0x20240101;
-    quint32 hwVer = 0x00010001;
-    quint32 fwVer = 0x00020001;
-    quint32 serial = 0x30303031;
-    quint32 maxCur = 0x0000012C;
-    quint32 maxTemp = 0x0000003C;
-    quint32 maxPower = 0x0000C350;
+    quint32 datecode = core->readRawRegister(0x07, 0x00);
+    quint32 hwVer = core->readRawRegister(0x07, 0x01);
+    quint32 fwVer = core->readRawRegister(0x07, 0x02);
+    quint32 serial = core->readRawRegister(0x07, 0x03);
+    quint32 maxCur = core->readRawRegister(0x07, 0x06);
+    quint32 maxTemp = core->readRawRegister(0x07, 0x07);
+    quint32 maxPower = core->readRawRegister(0x07, 0x08);
 
     if (m_devDatecode) m_devDatecode->setText(QString("0x%1").arg(datecode, 8, 16, QChar('0')).toUpper());
-    if (m_devHwVer) m_devHwVer->setText(QString("v%1.%2").arg((hwVer >> 16) & 0xFFFF).arg(hwVer & 0xFFFF));
-    if (m_devFwVer) m_devFwVer->setText(QString("v%1.%2").arg((fwVer >> 16) & 0xFFFF).arg(fwVer & 0xFFFF));
+    if (m_devHwVer) m_devHwVer->setText(QString("%1.%2").arg((hwVer >> 16) & 0xFFFF).arg(hwVer & 0xFFFF));
+    if (m_devFwVer) m_devFwVer->setText(QString("%1.%2").arg((fwVer >> 16) & 0xFFFF).arg(fwVer & 0xFFFF));
     if (m_devSerial) {
         char s[5] = {0};
         s[0] = (serial >> 24) & 0xFF;
@@ -818,7 +887,7 @@ void MainWindow::updateSimulationDevinfo()
         s[3] = serial & 0xFF;
         m_devSerial->setText(QString::fromLatin1(s, 4));
     }
-    if (m_devMaxCur) m_devMaxCur->setText(tr("%1 mA").arg(maxCur));
-    if (m_devMaxTemp) m_devMaxTemp->setText(tr("%1 °C").arg(maxTemp));
-    if (m_devMaxPower) m_devMaxPower->setText(tr("%1 mW").arg(maxPower));
+    if (m_devMaxCur) m_devMaxCur->setValue(static_cast<int>(maxCur));
+    if (m_devMaxTemp) m_devMaxTemp->setValue(static_cast<int>(maxTemp));
+    if (m_devMaxPower) m_devMaxPower->setValue(static_cast<int>(maxPower));
 }

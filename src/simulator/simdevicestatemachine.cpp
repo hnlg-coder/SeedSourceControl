@@ -125,9 +125,12 @@ void SimDeviceStateMachine::updateSimulation()
     double tempNoiseMag = m_temperatureReading * m_noiseAmplitude * 0.25;
     double pwrNoiseMag = m_powerReading * m_noiseAmplitude * 1.5;
 
-    m_noiseCurrent = m_rng.bounded(static_cast<int>(curNoiseMag * 100)) / 100.0;
-    m_noiseTemp = m_rng.bounded(static_cast<int>(tempNoiseMag * 100)) / 100.0;
-    m_noisePower = m_rng.bounded(static_cast<int>(pwrNoiseMag * 100)) / 100.0;
+    int curNBins = std::max(1, static_cast<int>(curNoiseMag * 100));
+    int tempNBins = std::max(1, static_cast<int>(tempNoiseMag * 100));
+    int pwrNBins = std::max(1, static_cast<int>(pwrNoiseMag * 100));
+    m_noiseCurrent = m_rng.bounded(curNBins) / 100.0;
+    m_noiseTemp = m_rng.bounded(tempNBins) / 100.0;
+    m_noisePower = m_rng.bounded(pwrNBins) / 100.0;
 
     quint32 curReading = static_cast<quint32>((m_currentReading + m_noiseCurrent) * 100);
     quint32 tempReading = static_cast<quint32>((m_temperatureReading + m_noiseTemp) * 1000);

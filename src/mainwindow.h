@@ -7,6 +7,8 @@
 #include <QSlider>
 #include <QCheckBox>
 #include <QGroupBox>
+#include <QLineEdit>
+#include <QSpinBox>
 #include <QPropertyAnimation>
 #include <QSharedPointer>
 #include <atomic>
@@ -63,6 +65,7 @@ private:
     void toggleSimulationMode();
     void setupSimulationPanel();
     void updateSimulationDevinfo();
+    void writeSimulationDevinfo();
     void sendCommand(QSharedPointer<ICommand> cmd);
     void onCommandCompleted(quint32 cmdId, bool success, QVariant result);
 
@@ -115,12 +118,12 @@ private:
     QSlider* m_simTempLag;
 
     QLabel* m_devDatecode;
-    QLabel* m_devHwVer;
-    QLabel* m_devFwVer;
-    QLabel* m_devSerial;
-    QLabel* m_devMaxCur;
-    QLabel* m_devMaxTemp;
-    QLabel* m_devMaxPower;
+    QLineEdit* m_devHwVer;
+    QLineEdit* m_devFwVer;
+    QLineEdit* m_devSerial;
+    QSpinBox* m_devMaxCur;
+    QSpinBox* m_devMaxTemp;
+    QSpinBox* m_devMaxPower;
 };
 
 #endif // MAINWINDOW_H

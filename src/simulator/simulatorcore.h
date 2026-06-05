@@ -33,6 +33,9 @@ public:
     SimDeviceStateMachine* stateMachine() const { return m_stateMachine; }
     FaultInjector* faultInjector() const { return m_faultInjector; }
 
+    quint32 readRawRegister(quint8 baseAddr, quint8 offset) const;
+    void writeRawRegister(quint8 baseAddr, quint8 offset, quint32 value);
+
 signals:
     void dataUpdated(double current, double temperature, double power);
     void logMessage(const QString& message);
