@@ -44,7 +44,7 @@ void FaultInjector::setCorruptRate(double v)
 void FaultInjector::setResponseDelay(int ms)
 {
     if (ms < 0) ms = 0;
-    if (ms > 5000) ms = 5000;
+    if (ms > 2000) ms = 2000;
     if (m_responseDelay != ms) {
         m_responseDelay = ms;
         emit responseDelayChanged(ms);
@@ -106,6 +106,10 @@ QByteArray FaultInjector::corruptData(const QByteArray& data)
 
     QByteArray result = data;
     int dataLen = static_cast<int>(static_cast<quint8>(result[3]));
+    // 钳制到实际 payload 长度，防止 dataLength 字段声明值大于真实帧大小时越界写入
+    if (dataLen > result.size() - 6) {
+        dataLen = result.size() - 6;
+    }
     if (dataLen > 0) {
         int pos = 4 + m_rng.bounded(dataLen);
         result[pos] = static_cast<char>(result[pos] ^ 0xFF);

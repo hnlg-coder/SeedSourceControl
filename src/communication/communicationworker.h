@@ -211,6 +211,7 @@ private:
     CommunicationState m_state;  // 通信状态
     QTimer* m_pollTimer;      // 轮询定时器
     bool m_threadFinished;    // 线程是否已完成
+    bool m_stopRequested;      // 是否请求停止（stopCommunication 设置）
 
     IProtocolParser* m_protocolParser;  // 协议解析器
 

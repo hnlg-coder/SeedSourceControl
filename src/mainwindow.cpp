@@ -90,14 +90,14 @@ MainWindow::~MainWindow()
         m_communicationWorker->stopCommunication();
         disconnect(m_communicationWorker, nullptr, this, nullptr);
         m_communicationWorker->wait();
-        delete m_communicationWorker;
+        // 不 delete — 父对象为 this，Qt 父子机制自动清理
         m_communicationWorker = nullptr;
     }
 
     if (m_simulationWorker) {
         m_simulationWorker->stopCommunication();
         disconnect(m_simulationWorker, nullptr, this, nullptr);
-        delete m_simulationWorker;
+        // 不 delete — 父对象为 this，Qt 父子机制自动清理
         m_simulationWorker = nullptr;
     }
 
@@ -387,22 +387,6 @@ void MainWindow::onStopClicked()
     statusBar()->showMessage(tr("已停止"));
 }
 
-void MainWindow::onResetClicked()
-{
-    auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Reset, m_protocolParser);
-    sendCommand(command);
-
-    m_logPanel->logMessage(tr("设备重置"), LogPanel::Info);
-}
-
-void MainWindow::onCalibrateClicked()
-{
-    auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Calibrate, m_protocolParser);
-    sendCommand(command);
-
-    m_logPanel->logMessage(tr("设备校准"), LogPanel::Info);
-}
-
 void MainWindow::onCurrentSetChanged(double value)
 {
     if (m_connected && m_running) {
@@ -425,7 +409,7 @@ void MainWindow::onTemperatureSetChanged(double value)
 
 void MainWindow::onConfigChanged()
 {
-    DeviceDataModel::ConfigBits cfg = m_configWidget->getConfigData();
+    DeviceDataModel::ConfigBits cfg = m_configWidget->configData();
 
     // 构建 CONFIG 寄存器写入数据 (bit0-5 + 保留位)
     quint32 configReg = 0;
@@ -482,16 +466,6 @@ void MainWindow::onConnectionStateChanged(bool connected)
 void MainWindow::onLogMessage(const QString& message)
 {
     m_logPanel->logMessage(message, LogPanel::Info);
-}
-
-void MainWindow::onDataUpdated()
-{
-    // 此方法已通过 lambda 连接处理，保留用于兼容
-}
-
-void MainWindow::onAlarmTriggered(quint32 alarmCode, const QString& message)
-{
-    // 此方法已通过 lambda 连接处理，保留用于兼容
 }
 
 void MainWindow::toggleDrawer()
@@ -614,7 +588,7 @@ void MainWindow::setupSimulationPanel()
 
     faultLayout->addWidget(new QLabel(tr("响应延迟:")), 3, 0);
     m_faultDelay = new QSlider(Qt::Horizontal);
-    m_faultDelay->setRange(0, 500);
+    m_faultDelay->setRange(0, 200);
     m_faultDelay->setValue(0);
     m_faultDelay->setTickPosition(QSlider::TicksBelow);
     m_faultDelay->setTickInterval(50);

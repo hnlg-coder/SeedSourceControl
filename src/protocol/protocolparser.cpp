@@ -41,6 +41,7 @@ QByteArray SeedSourceProtocolParser::buildFrame(CommandType type, const QVariant
                 addrByte = static_cast<quint8>((baseAddr << 4) | (offset & 0x0F));
                 // payload: 写入字节数 + 大端序值
                 quint8 writeLen = list.size() >= 4 ? list[3].toUInt() : 4;
+                if (writeLen < 1) writeLen = 1;   // 至少 1 字节，防止循环不执行
                 payload.append(writeLen);
                 for (int i = writeLen - 1; i >= 0; --i) {
                     payload.append(static_cast<quint8>((value >> (i * 8)) & 0xFF));

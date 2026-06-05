@@ -10,6 +10,7 @@ CommunicationWorker::CommunicationWorker(QObject* parent)
     , m_state(Idle)
     , m_pollTimer(nullptr)
     , m_threadFinished(false)
+    , m_stopRequested(false)
     , m_protocolParser(nullptr)
     , m_handshakeTimer(nullptr)
     , m_connecting(false)
@@ -125,8 +126,9 @@ void CommunicationWorker::stopCommunication()
 {
     // 如果线程正在运行，请求断开并退出事件循环
     if (isRunning()) {
-        emit disconnectRequested();
-        quit();
+        m_stopRequested = true;      // 标记停止请求，供 doDisconnectDevice 检查
+        emit disconnectRequested();  // 排队到子线程执行断开
+        quit();                      // 设置退出标志（pending 事件处理完后生效）
     }
 
     emit logMessage("Communication stopped");
@@ -321,6 +323,11 @@ void CommunicationWorker::doDisconnectDevice()
         emit connectionStateChanged(false);
         emit logMessage("Device disconnected");
     }
+
+    // 如果 stopCommunication() 已请求退出且我们刚完成断开，确保事件循环退出
+    if (m_stopRequested) {
+        quit();
+    }
 }
 
 void CommunicationWorker::doSendCommand(QSharedPointer<ICommand> command)
@@ -347,6 +354,12 @@ void CommunicationWorker::processCommandQueue()
             return;
         }
         command = m_commandQueue.dequeue();
+    }
+
+    // 检查命令是否已在队列中超时（排队过长，状态已被外部变更）
+    if (command->state() != ICommand::Pending) {
+        emit logMessage(QString("跳过过期命令: %1").arg(command->description()));
+        return;
     }
 
     {
