@@ -34,6 +34,7 @@ void CommunicationWorker::setSerialConfig(const QString& portName, qint32 baudRa
                                            QSerialPort::StopBits stopBits,
                                            QSerialPort::FlowControl flowControl)
 {
+    QMutexLocker locker(&m_configMutex);
     m_portName = portName;
     m_baudRate = baudRate;
     m_dataBits = dataBits;
@@ -52,12 +53,15 @@ void CommunicationWorker::run()
 {
     // 在子线程中创建QSerialPort，确保所有串口操作在同一线程
     m_serialPort = new QSerialPort();
-    m_serialPort->setPortName(m_portName);
-    m_serialPort->setBaudRate(m_baudRate);
-    m_serialPort->setDataBits(m_dataBits);
-    m_serialPort->setParity(m_parity);
-    m_serialPort->setStopBits(m_stopBits);
-    m_serialPort->setFlowControl(m_flowControl);
+    {
+        QMutexLocker locker(&m_configMutex);
+        m_serialPort->setPortName(m_portName);
+        m_serialPort->setBaudRate(m_baudRate);
+        m_serialPort->setDataBits(m_dataBits);
+        m_serialPort->setParity(m_parity);
+        m_serialPort->setStopBits(m_stopBits);
+        m_serialPort->setFlowControl(m_flowControl);
+    }
 
     // 连接串口数据就绪信号（在子线程中）
     connect(m_serialPort, &QSerialPort::readyRead, this, &CommunicationWorker::onSerialDataReady);
@@ -154,12 +158,15 @@ void CommunicationWorker::doConnectDevice()
 
     if (!m_serialPort->isOpen()) {
         // 更新串口配置（主线程可能已更新配置）
-        m_serialPort->setPortName(m_portName);
-        m_serialPort->setBaudRate(m_baudRate);
-        m_serialPort->setDataBits(m_dataBits);
-        m_serialPort->setParity(m_parity);
-        m_serialPort->setStopBits(m_stopBits);
-        m_serialPort->setFlowControl(m_flowControl);
+        {
+            QMutexLocker locker(&m_configMutex);
+            m_serialPort->setPortName(m_portName);
+            m_serialPort->setBaudRate(m_baudRate);
+            m_serialPort->setDataBits(m_dataBits);
+            m_serialPort->setParity(m_parity);
+            m_serialPort->setStopBits(m_stopBits);
+            m_serialPort->setFlowControl(m_flowControl);
+        }
 
         if (m_serialPort->open(QIODevice::ReadWrite)) {
             {
@@ -387,14 +394,16 @@ void CommunicationWorker::checkConnection()
 {
     if (m_serialPort) {
         bool wasConnected;
+        bool newConnected;
         {
             QMutexLocker locker(&m_stateMutex);
             wasConnected = m_connected;
             m_connected = m_serialPort->isOpen();
+            newConnected = m_connected;
         }
 
-        if (wasConnected != m_connected) {
-            emit connectionStateChanged(m_connected);
+        if (wasConnected != newConnected) {
+            emit connectionStateChanged(newConnected);
         }
     }
 }

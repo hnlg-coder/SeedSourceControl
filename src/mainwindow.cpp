@@ -61,7 +61,8 @@ MainWindow::~MainWindow()
     if (m_communicationWorker) {
         m_communicationWorker->stopCommunication();
         disconnect(m_communicationWorker, nullptr, this, nullptr);
-        m_communicationWorker->deleteLater();
+        m_communicationWorker->wait();
+        delete m_communicationWorker;
         m_communicationWorker = nullptr;
     }
 
@@ -137,10 +138,6 @@ void MainWindow::createMenus()
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &QMainWindow::close);
     fileMenu->addAction(exitAction);
-
-    QMenu* viewMenu = menuBar()->addMenu(tr("视图(&V)"));
-
-    QMenu* toolMenu = menuBar()->addMenu(tr("工具(&T)"));
 
     QMenu* helpMenu = menuBar()->addMenu(tr("帮助(&H)"));
 
@@ -218,16 +215,23 @@ void MainWindow::connectSignals()
     // 命令完成信号 -> 更新数据模型
     connect(m_communicationWorker, &CommunicationWorker::commandCompleted,
             this, [this](quint32 cmdId, bool success, QVariant result) {
+        Q_UNUSED(cmdId);
         if (success && result.isValid()) {
-            if (result.userType() == QMetaType::type("QVariantMap")) {
-                QVariantMap statusMap = result.toMap();
-                double current = statusMap.value("current", 0).toDouble();
-                double temperature = statusMap.value("temperature", 0).toDouble();
-                double power = statusMap.value("power", 0).toDouble();
-                quint32 status = statusMap.value("status", 0).toUInt();
-                quint32 alarm = statusMap.value("alarm", 0).toUInt();
-                m_dataModel->updateData(current, temperature, power, status, alarm);
-            }
+            QVariantMap statusMap = result.toMap();
+
+            // 从ReadStatusCommand响应中提取原始寄存器值
+            double current = statusMap.value("current", 0).toDouble();
+            double temperature = statusMap.value("temperature", 0).toDouble();
+            double power = statusMap.value("power", 0).toDouble();
+            quint32 status = statusMap.value("status", 0).toUInt();
+            quint32 alarm = statusMap.value("alarm", 0).toUInt();
+
+            // 值域转换（假设协议中单位为0.01mA, 0.001°C, 0.01mW）
+            double currentVal = current / 100.0;
+            double tempVal = temperature / 1000.0;
+            double powerLas = power / 100.0;
+
+            m_dataModel->updateData(currentVal, tempVal, powerLas, status, alarm);
         }
     });
 
@@ -360,8 +364,26 @@ void MainWindow::onTemperatureSetChanged(double value)
 
 void MainWindow::onConfigChanged()
 {
-    m_logPanel->logMessage(tr("配置已变更，需要发送配置写入命令"), LogPanel::Warning);
-    // 配置写入命令将在后续实现
+    DeviceDataModel::ConfigBits cfg = m_configWidget->getConfigData();
+
+    // 构建 CONFIG 寄存器写入数据 (bit0-5 + 保留位)
+    quint32 configReg = 0;
+    if (cfg.tcEn)    configReg |= 0x01;
+    if (cfg.ccEn)    configReg |= 0x02;
+    if (cfg.aeEn)    configReg |= 0x04;
+    if (cfg.powerSv) configReg |= 0x08;
+    if (cfg.curSv)   configReg |= 0x10;
+    if (cfg.tempSv)  configReg |= 0x20;
+
+    if (m_connected) {
+        auto command = CommandFactory::createWriteRegisterCommand(0x05, 0x00, configReg, m_protocolParser);
+        m_communicationWorker->sendCommand(command);
+        m_logPanel->logMessage(
+            tr("配置已更新: TC_EN=%1 CC_EN=%2 AE_EN=%3").arg(cfg.tcEn).arg(cfg.ccEn).arg(cfg.aeEn),
+            LogPanel::Info);
+    } else {
+        m_logPanel->logMessage(tr("配置变更将在设备连接后生效"), LogPanel::Warning);
+    }
 }
 
 void MainWindow::onConnectionStateChanged(bool connected)

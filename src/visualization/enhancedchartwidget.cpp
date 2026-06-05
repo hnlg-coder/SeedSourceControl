@@ -164,6 +164,16 @@ QImage EnhancedChartWidget::RenderThread::renderToImage(const QSize& size)
         }
     }
 
+    // 防止除以零：确保Y轴范围有效
+    if (localYMax - localYMin < 1e-9) {
+        localYMax = localYMin + 1.0;
+    }
+
+    // 防止除以零：确保时间范围有效
+    if (localTimeRange <= 0) {
+        localTimeRange = 60;
+    }
+
     // Y轴标签
     painter.setFont(QFont("Consolas", 8));
     for (int i = 0; i <= numHLines; ++i) {

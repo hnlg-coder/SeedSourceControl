@@ -99,6 +99,10 @@ void DeviceDataModel::updateData(double current, double temperature, double powe
     m_currentData.curVal = current;
     m_currentData.tempVal = temperature;
     m_currentData.pwrLas = power;
+
+    // 设定值兜底：当设备未返回设定值时使用实际值
+    if (m_currentData.curSet == 0) m_currentData.curSet = current;
+    if (m_currentData.tempSet == 0) m_currentData.tempSet = temperature;
     m_currentData.status = StatusBits::fromRaw(status);
     m_currentData.alert = AlertBits::fromRaw(alarm);
     m_currentData.statusRaw = status;

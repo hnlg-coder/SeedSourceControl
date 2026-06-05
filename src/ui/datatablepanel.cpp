@@ -91,8 +91,8 @@ void DataTablePanel::addDataRow(const DeviceDataModel::RealTimeData& data)
     // 滚动到底部
     m_dataTable->scrollToBottom();
     
-    // 限制最大行数
-    if (row > 1000) {
+    // 限制最大行数（保持不超过1000行）
+    if (row >= 1000) {
         m_dataTable->removeRow(0);
     }
 }

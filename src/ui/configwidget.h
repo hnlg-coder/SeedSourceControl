@@ -21,6 +21,9 @@ public:
 public slots:
     void updateData(const DeviceDataModel::RealTimeData& data);
 
+    /// 获取控件中当前的配置值
+    DeviceDataModel::ConfigBits getConfigData() const;
+
 signals:
     void configChanged();
 

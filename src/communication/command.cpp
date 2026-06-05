@@ -152,29 +152,38 @@ bool ReadStatusCommand::parseResponse(const QByteArray& response)
     DeviceData data;
     if (m_parser->parseFrame(response, data)) {
         QVariantMap statusMap;
-        if (data.data.size() >= 12) {
-            quint32 current = 0;
-            current |= static_cast<quint8>(data.data[0]) << 24;
-            current |= static_cast<quint8>(data.data[1]) << 16;
-            current |= static_cast<quint8>(data.data[2]) << 8;
-            current |= static_cast<quint8>(data.data[3]);
-            
-            quint32 temp = 0;
-            temp |= static_cast<quint8>(data.data[4]) << 24;
-            temp |= static_cast<quint8>(data.data[5]) << 16;
-            temp |= static_cast<quint8>(data.data[6]) << 8;
-            temp |= static_cast<quint8>(data.data[7]);
-            
-            quint32 power = 0;
-            power |= static_cast<quint8>(data.data[8]) << 24;
-            power |= static_cast<quint8>(data.data[9]) << 16;
-            power |= static_cast<quint8>(data.data[10]) << 8;
-            power |= static_cast<quint8>(data.data[11]);
-            
-            statusMap["current"] = current;
-            statusMap["temperature"] = temp;
-            statusMap["power"] = power;
+
+        // 辅助lambda: 从字节数组中提取32位大端值
+        auto extractU32 = [](const QByteArray& arr, int offset) -> quint32 {
+            quint32 val = 0;
+            val |= static_cast<quint8>(arr[offset]) << 24;
+            val |= static_cast<quint8>(arr[offset + 1]) << 16;
+            val |= static_cast<quint8>(arr[offset + 2]) << 8;
+            val |= static_cast<quint8>(arr[offset + 3]);
+            return val;
+        };
+
+        // 解析 STATUS 寄存器 (偏移0-3)
+        if (data.data.size() >= 4) {
+            statusMap["status"] = extractU32(data.data, 0);
         }
+        // 解析 ALERT 寄存器 (偏移4-7)
+        if (data.data.size() >= 8) {
+            statusMap["alarm"] = extractU32(data.data, 4);
+        }
+        // 解析 CUR 寄存器 (偏移8-11)
+        if (data.data.size() >= 12) {
+            statusMap["current"] = extractU32(data.data, 8);
+        }
+        // 解析 TEMP 寄存器 (偏移12-15)
+        if (data.data.size() >= 16) {
+            statusMap["temperature"] = extractU32(data.data, 12);
+        }
+        // 解析 POWER 寄存器 (偏移16-19)
+        if (data.data.size() >= 20) {
+            statusMap["power"] = extractU32(data.data, 16);
+        }
+
         setResult(statusMap);
         return true;
     }

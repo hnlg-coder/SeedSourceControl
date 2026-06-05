@@ -139,3 +139,18 @@ void ConfigWidget::setupUI()
 
     connect(m_applyConfigButton, &QPushButton::clicked, this, &ConfigWidget::configChanged);
 }
+
+DeviceDataModel::ConfigBits ConfigWidget::getConfigData() const
+{
+    DeviceDataModel::ConfigBits c;
+    c.tcEn    = m_tcEnCheck->isChecked();
+    c.ccEn    = m_ccEnCheck->isChecked();
+    c.aeEn    = m_aeEnCheck->isChecked();
+    c.powerSv = m_powerSvCheck->isChecked();
+    c.curSv   = m_curSvCheck->isChecked();
+    c.tempSv  = m_tempSvCheck->isChecked();
+    c.curTh   = m_curThSpinBox->value();
+    c.curSlope = m_curSlopeSpinBox->value();
+    c.baudRate = static_cast<quint8>(m_baudRateCombo->currentIndex());
+    return c;
+}

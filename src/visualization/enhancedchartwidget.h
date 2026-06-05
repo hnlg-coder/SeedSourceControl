@@ -151,8 +151,8 @@ private:
         EnhancedChartWidget* m_parent;
         QMutex m_renderMutex;
         QWaitCondition m_renderCondition;
-        bool m_running;
-        bool m_renderRequested;
+        std::atomic<bool> m_running;
+        std::atomic<bool> m_renderRequested;
     };
 
     friend class RenderThread;
