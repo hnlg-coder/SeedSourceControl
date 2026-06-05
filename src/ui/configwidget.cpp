@@ -140,7 +140,7 @@ void ConfigWidget::setupUI()
     connect(m_applyConfigButton, &QPushButton::clicked, this, &ConfigWidget::configChanged);
 }
 
-DeviceDataModel::ConfigBits ConfigWidget::getConfigData() const
+DeviceDataModel::ConfigBits ConfigWidget::configData() const
 {
     DeviceDataModel::ConfigBits c;
     c.tcEn    = m_tcEnCheck->isChecked();

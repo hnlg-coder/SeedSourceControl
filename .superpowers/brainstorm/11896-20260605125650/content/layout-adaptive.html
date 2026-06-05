@@ -1,0 +1,86 @@
+<h2>窗口大小可调 & 自适应布局方案</h2>
+<p class="subtitle">当前窗口固定为 1280×900，需要改为支持自由缩放并对控件做自适应适配</p>
+
+<div class="section">
+  <h3>当前问题</h3>
+  <ul>
+    <li>窗口固定为 <code>resize(1280, 900)</code>，无自由缩放行为</li>
+    <li>内部控件缺乏弹性尺寸策略，缩放后布局可能错乱</li>
+    <li>串口配置面板使用固定最小宽度，小窗口下可能溢出</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>布局自适应策略</h3>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">小窗口 (≥800×600)</div>
+    <div class="mockup-body" style="font-size: 11px;">
+      <div style="border: 1px solid #ddd; padding: 4px; margin-bottom: 4px;">
+        <span style="color: #888;">串口连接 (可折叠/换行)</span>
+      </div>
+      <div style="display: flex; gap: 4px; border: 1px solid #ddd; padding: 2px; margin-bottom: 4px; flex-wrap: wrap;">
+        <span style="padding: 2px 6px; background: #e3f2fd;">总览</span>
+        <span style="padding: 2px 6px;">电流</span>
+        <span style="padding: 2px 6px;">温度</span>
+        <span style="padding: 2px 6px;">功率</span>
+        <span style="padding: 2px 6px;">配置</span>
+        <span style="padding: 2px 6px;">报警</span>
+        <span style="padding: 2px 6px;">统计</span>
+      </div>
+      <div class="placeholder" style="height: 200px;">主内容区 (弹性伸缩)</div>
+      <div class="placeholder" style="height: 80px; background: #333; color: #aaa;">日志</div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">大窗口 (≥1280×900)</div>
+    <div class="mockup-body" style="font-size: 11px;">
+      <div style="border: 1px solid #ddd; padding: 4px; margin-bottom: 4px;">
+        <span style="color: #888;">串口连接 (完整展开)</span>
+      </div>
+      <div style="display: flex; gap: 4px; border: 1px solid #ddd; padding: 2px; margin-bottom: 4px;">
+        <span style="padding: 2px 8px; background: #e3f2fd;">总览</span>
+        <span style="padding: 2px 8px;">电流控制</span>
+        <span style="padding: 2px 8px;">温度控制</span>
+        <span style="padding: 2px 8px;">功率监测</span>
+        <span style="padding: 2px 8px;">设备配置</span>
+        <span style="padding: 2px 8px;">报警管理</span>
+        <span style="padding: 2px 8px;">数据统计</span>
+      </div>
+      <div class="placeholder" style="height: 300px;">主内容区 (充分利用空间)</div>
+      <div class="placeholder" style="height: 100px; background: #333; color: #aaa;">日志</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>具体措施</h3>
+  <table style="width:100%; font-size: 13px; border-collapse: collapse;">
+    <tr style="background: #f5f5f5;">
+      <td style="padding: 6px; border: 1px solid #ddd;"><strong>组件</strong></td>
+      <td style="padding: 6px; border: 1px solid #ddd;"><strong>策略</strong></td>
+    </tr>
+    <tr>
+      <td style="padding: 6px; border: 1px solid #ddd;">主窗口</td>
+      <td style="padding: 6px; border: 1px solid #ddd;">setMinimumSize(800, 600)，移除固定 resize</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px; border: 1px solid #ddd;">串口面板</td>
+      <td style="padding: 6px; border: 1px solid #ddd;">QComboBox 设置弹性 SizePolicy；小窗口时控件自动换行</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px; border: 1px solid #ddd;">QTabWidget</td>
+      <td style="padding: 6px; border: 1px solid #ddd;">已设置 stretch=1，自动填充空间 ✓</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px; border: 1px solid #ddd;">日志面板</td>
+      <td style="padding: 6px; border: 1px solid #ddd;">设置弹性高度范围 (80-200px)，随窗口伸缩</td>
+    </tr>
+    <tr>
+      <td style="padding: 6px; border: 1px solid #ddd;">图表控件</td>
+      <td style="padding: 6px; border: 1px solid #ddd;">已有 minimumSize 400×300，自动缩放渲染 ✓</td>
+    </tr>
+  </table>
+</div>

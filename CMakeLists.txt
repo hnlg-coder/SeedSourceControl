@@ -190,6 +190,9 @@ set(SIM_TEST_SOURCES
     src/simulator/faultinjector.h
     src/simulator/faultinjector.cpp
 
+    src/model/devicedatamodel.h
+    src/model/devicedatamodel.cpp
+
     tests/test_simulation.cpp
 )
 

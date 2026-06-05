@@ -1,0 +1,134 @@
+<h2>串口设置布局重构方案</h2>
+<p class="subtitle">当前问题：缩小窗口后串口配置行显示不全，6个下拉框+2个按钮挤在一行</p>
+
+<div class="section">
+  <h3>当前布局（问题展示）</h3>
+  <div class="mockup">
+    <div class="mockup-header">窗口宽度 ~800px 时</div>
+    <div class="mockup-body" style="padding:12px">
+      <div style="background:#e8e8e8;padding:6px 8px;border-radius:3px;overflow:hidden;white-space:nowrap">
+        <span style="font-size:10px;margin-right:2px">Port:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">COM3 ▾</button>
+        <span style="font-size:10px;margin-right:2px">Baud:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">115200 ▾</button>
+        <span style="font-size:10px;margin-right:2px">Data:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">8 ▾</button>
+        <span style="font-size:10px;margin-right:2px">Par:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">None ▾</button>
+        <span style="font-size:10px;margin-right:2px">Stop:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">1 ▾</button>
+        <span style="font-size:10px;margin-right:2px">Flow:</span><button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px 0 0">None ▾</button>
+        <button class="mock-button" style="font-size:9px;padding:1px 8px;margin:0 2px">↻</button>
+        <button class="mock-button" style="font-size:9px;padding:1px 10px;background:#4CAF50;color:white">Connect</button>
+        <span style="font-size:10px;color:red;margin-left:6px">● Disconnected</span>
+      </div>
+      <p style="font-size:10px;color:#999;margin:6px 0 0">⚠ 12个控件挤在一行，缩小到~900px就开始裁剪/溢出</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>三种重构方案</h3>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案A：串口设置移入"总览"页签顶部</h3>
+      <p>将 ConnectionPanel 从全局顶部栏移至总览页签内最上方，简化顶部只保留连接状态指示条</p>
+      <div class="mockup" style="margin-top:8px">
+        <div class="mockup-header">总览 TAB（窗口缩小时）</div>
+        <div class="mockup-body" style="padding:8px">
+          <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:6px 8px;margin-bottom:8px">
+            <span style="font-size:11px;font-weight:bold">串口配置：</span>
+            <button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px">COM3 ▾</button>
+            <button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px">115200 ▾</button>
+            <button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px">8N1 ▾</button>
+            <button class="mock-button" style="font-size:9px;padding:1px 6px;margin:0 3px">None ▾</button>
+            <button class="mock-button" style="font-size:9px;padding:1px 8px;margin:0 3px;background:#4CAF50;color:white">Connect</button>
+          </div>
+          <div class="placeholder" style="height:120px">仪表盘 / 实时数据区域</div>
+          <div class="placeholder" style="height:60px;margin-top:4px">日志面板</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>优点</h4><ul><li>不需新增页签</li><li>串口配置靠近数据展示区，逻辑聚合</li><li>其他功能页签界面更干净</li><li>改动量最小</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>配置与数据混合在同一页面</li><li>连接后需隐藏配置区避免占空间</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案B：串口设置独立为"连接设置"页签并置顶</h3>
+      <p>新增一个 TAB 页叫"连接设置"，放在所有功能页签之前（默认显示），原来的串口配置行改为简洁状态条</p>
+      <div class="mockup" style="margin-top:8px">
+        <div class="mockup-header">TabBar 排列</div>
+        <div class="mockup-body" style="padding:8px">
+          <div style="display:flex;border-bottom:2px solid #ddd;background:#f9f9f9;padding:4px 8px;gap:2px;flex-wrap:wrap">
+            <span style="background:#fff;border:1px solid #bbb;border-bottom-color:white;padding:4px 12px;font-size:11px;font-weight:bold">🔌 连接设置</span>
+            <span style="padding:4px 10px;font-size:10px">总览</span>
+            <span style="padding:4px 10px;font-size:10px">电流控制</span>
+            <span style="padding:4px 10px;font-size:10px">温度控制</span>
+            <span style="padding:4px 10px;font-size:10px">...</span>
+          </div>
+          <div style="padding:10px">
+            <p style="font-size:10px;color:#666;margin-bottom:8px">在"连接设置"页签中提供宽敞的串口配置区域</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
+              <div>串口：<button class="mock-button" style="padding:1px 6px">COM3 ▾</button></div>
+              <div>波特率：<button class="mock-button" style="padding:1px 6px">115200 ▾</button></div>
+              <div>数据位：<button class="mock-button" style="padding:1px 6px">8 ▾</button></div>
+              <div>校验位：<button class="mock-button" style="padding:1px 6px">None ▾</button></div>
+              <div>停止位：<button class="mock-button" style="padding:1px 6px">1 ▾</button></div>
+              <div>流控制：<button class="mock-button" style="padding:1px 6px">None ▾</button></div>
+            </div>
+            <div style="margin-top:8px">
+              <button class="mock-button" style="background:#4CAF50;color:white;padding:4px 16px">Connect</button>
+              <button class="mock-button" style="padding:4px 12px;margin-left:4px">Refresh</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>优点</h4><ul><li>各功能页签完全不受串口配置干扰</li><li>配置页签空间充足，可用FormLayout规范排列</li><li>视觉层次清晰，分隔明确</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>多一个页签（总计8个），TabBar可能拥挤</li><li>连接状态在另一个页面，操作时需切换回来看</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>方案C：顶部仅保留"连接状态条"，串口设置折叠在侧边栏抽屉中</h3>
+      <p>顶部只显示一行简洁状态条（已连接/已断开 + IP/端口信息），点击展开侧边抽屉面板进行串口配置</p>
+      <div class="mockup" style="margin-top:8px">
+        <div class="mockup-header">紧凑模式</div>
+        <div class="mockup-body" style="padding:8px">
+          <div style="display:flex;align-items:center;background:#2c3e50;color:white;padding:4px 12px;border-radius:3px;gap:8px">
+            <span style="font-size:10px">🔌 COM3 @ 115200</span>
+            <span style="font-size:10px;color:#2ecc71">● 已连接</span>
+            <span style="flex:1"></span>
+            <button class="mock-button" style="font-size:9px;padding:1px 8px;background:#e74c3c;color:white;border:none">断开</button>
+            <button class="mock-button" style="font-size:9px;padding:1px 8px;background:#34495e;color:white;border:1px solid #7f8c8d">⚙ 配置</button>
+          </div>
+          <div style="display:flex;margin-top:6px;gap:6px">
+            <div style="background:#f5f5f5;border:1px dashed #ccc;width:200px;padding:8px;font-size:10px;color:#999">
+              展开后的配置面板（抽屉/弹出）
+              <div style="margin-top:6px;font-size:9px">
+                <div>串口：COM3 ▾</div>
+                <div>波特率：115200 ▾</div>
+                <div>数据位：8 ▾</div>
+                <div>校验位：None ▾</div>
+                <div>停止位：1 ▾</div>
+                <div>流控制：None ▾</div>
+                <button class="mock-button" style="background:#4CAF50;color:white;font-size:9px;padding:2px 12px;margin-top:6px">应用配置</button>
+              </div>
+            </div>
+            <div class="placeholder" style="flex:1;height:120px">Tab 功能区域</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>优点</h4><ul><li>极致紧凑，窗口最小化时体验最好</li><li>状态信息始终可见</li><li>现代感的抽屉交互</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>实现复杂度最高（需抽屉动画/QPropertyAnimation）</li><li>配置操作多了一步点击</li><li>不符合用户现有操作习惯</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,38 @@
+﻿{
+    "mcpServers":  {
+                       "GitHub":  {
+                                      "command":  "C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\bin\\npx.cmd",
+                                      "args":  [
+                                                   "-y",
+                                                   "@modelcontextprotocol/server-github"
+                                               ],
+                                      "env":  {
+                                                  "GITHUB_PERSONAL_ACCESS_TOKEN":  "REDACTED",
+                                                  "PATH":  "C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\node;C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\bin;%PATH%"
+                                              },
+                                      "fromGalleryId":  "byted-mcp-volcengine.github"
+                                  },
+                       "Everything":  {
+                                          "command":  "C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\bin\\npx.cmd",
+                                          "args":  [
+                                                       "-y",
+                                                       "everything-mcp"
+                                                   ],
+                                          "env":  {
+                                                      "ES_PATH":  "C:\\Program Files\\Everything\\es.exe",
+                                                      "PATH":  "C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\node;C:\\Users\\ADMINI~1\\AppData\\Roaming\\TRAESO~1\\MODULA~1\\ai-agent\\vm\\tools\\bin;%PATH%"
+                                                  },
+                                          "description":  "Windows Everything file search with filters for type, size, and date"
+                                      },
+                       "Pandoc":  {
+                                      "command":  "C:\\Users\\Administrator\\.local\\bin\\uvx.exe",
+                                      "args":  [
+                                                   "mcp-pandoc"
+                                               ],
+                                      "env":  {
+                                                  "PATH":  "C:\\Users\\Administrator\\.local\\bin;%PATH%"
+                                              },
+                                      "fromGalleryId":  "byted-mcp-volcengine.pandoc"
+                                  }
+                   }
+}

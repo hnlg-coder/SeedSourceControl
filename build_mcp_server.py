@@ -99,7 +99,8 @@ def handle_build_project(args):
     # Step 1: cmake configure
     lines.append(f"=== CMake Configure ({config}) ===")
     BUILD_DIR.mkdir(exist_ok=True)
-    cmake_cmd = f'cmake .. -DCMAKE_BUILD_TYPE={config}'
+    qt6_dir = "D:/Qt6.9.1/6.5.3/msvc2019_64/lib/cmake/Qt6"
+    cmake_cmd = f'cmake .. -DCMAKE_BUILD_TYPE={config} -DQt6_DIR="{qt6_dir}"'
     out, code = run_command(cmake_cmd, cwd=str(BUILD_DIR))
     lines.append(out)
     if code != 0:

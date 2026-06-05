@@ -1,5 +1,6 @@
 #include "datatablepanel.h"
 #include <QStringConverter>
+#include <QMessageBox>
 
 /**
  * @brief 构造函数
@@ -124,6 +125,8 @@ void DataTablePanel::exportToCsv()
     // 打开文件
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("导出失败"),
+                            tr("无法打开文件: %1").arg(file.errorString()));
         return;
     }
     

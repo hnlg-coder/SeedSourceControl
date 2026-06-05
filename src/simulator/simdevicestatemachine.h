@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QTimer>
 #include <QRandomGenerator>
-#include <QElapsedTimer>
 #include "simregistermanager.h"
 
 class SimDeviceStateMachine : public QObject {

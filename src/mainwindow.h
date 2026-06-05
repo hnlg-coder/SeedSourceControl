@@ -43,16 +43,12 @@ private slots:
     void onDisconnectClicked();
     void onStartClicked();
     void onStopClicked();
-    void onResetClicked();
-    void onCalibrateClicked();
     void onCurrentSetChanged(double value);
     void onTemperatureSetChanged(double value);
     void onConfigChanged();
 
     void onConnectionStateChanged(bool connected);
     void onLogMessage(const QString& message);
-    void onDataUpdated();
-    void onAlarmTriggered(quint32 alarmCode, const QString& message);
 
     void pollDevice();
 

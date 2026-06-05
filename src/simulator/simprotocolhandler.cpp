@@ -35,6 +35,13 @@ QByteArray SimProtocolHandler::handleFrame(const QByteArray& frame)
     quint8 deviceAddr = static_cast<quint8>(frame[1]);
     quint8 command = static_cast<quint8>(frame[2]);
     quint8 dataLength = static_cast<quint8>(frame[3]);
+
+    if (frame.size() != 6 + dataLength) {
+        emit logMessage(QStringLiteral("Frame data length mismatch: expected %1, got %2")
+                       .arg(6 + dataLength).arg(frame.size()));
+        return buildErrorFrame(deviceAddr, command, ERROR_INVALID_FRAME);
+    }
+
     QByteArray data = frame.mid(4, dataLength);
 
     emit logMessage(QStringLiteral("Received command: 0x%1").arg(command, 2, 16, QChar('0')));

@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QTextStream>
 #include <QScrollBar>
+#include <QMessageBox>
 
 LogPanel::LogPanel(QWidget* parent)
     : QWidget(parent)
@@ -60,6 +61,9 @@ void LogPanel::saveLog()
             QTextStream out(&file);
             out << m_logTextEdit->toPlainText();
             file.close();
+        } else {
+            QMessageBox::warning(this, tr("保存失败"),
+                                tr("无法保存日志: %1").arg(file.errorString()));
         }
     }
 }

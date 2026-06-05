@@ -1,0 +1,51 @@
+<h2>串口配置下拉菜单 - 右侧横杠问题</h2>
+<p class="subtitle">当前 QComboBox 自定义样式中将下拉箭头区域宽度设为 0、箭头图片设为 none，但 Windows 原生渲染仍会显示一条竖线/横杠</p>
+
+<div class="section">
+  <h3>当前效果</h3>
+  <div class="mockup">
+    <div class="mockup-body">
+      <div style="display: flex; gap: 8px; padding: 8px; background: #fff; align-items: center; font-size: 12px;">
+        <span style="color: #666;">Port:</span>
+        <div style="border: 1px solid #ccc; border-radius: 2px; padding: 2px 2px 2px 6px; background: white; display: flex; align-items: center;">
+          <span>COM1</span>
+          <div style="width: 1px; background: #ccc; margin-left: 2px; height: 16px;"></div>
+        </div>
+        <span style="color: #666; margin-left: 4px;">Baud:</span>
+        <div style="border: 1px solid #ccc; border-radius: 2px; padding: 2px 2px 2px 6px; background: white; display: flex; align-items: center;">
+          <span>115200</span>
+          <div style="width: 1px; background: #ccc; margin-left: 2px; height: 16px;"></div>
+        </div>
+        <span style="color: red; font-size: 10px; margin-left: 4px;">&larr; 横杠</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>两种修改方案</h3>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案A：改成下三角形</h3>
+      <p>用纯 CSS 绘制一个小三角箭头 (border trick)，外观类似标准下拉菜单，更美观</p>
+      <div style="margin-top: 8px; border: 1px solid #aaa; border-radius: 2px; padding: 3px 8px; background: white; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;">
+        <span>115200</span>
+        <span style="display:inline-block;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid #555;"></span>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案B：完全去掉横杠</h3>
+      <p>让下拉菜单看起来像普通输入框，干净简洁，点击后弹出下拉列表</p>
+      <div style="margin-top: 8px; border: 1px solid #aaa; border-radius: 2px; padding: 3px 8px; background: white; display: inline-flex; align-items: center; font-size: 12px;">
+        <span>115200</span>
+      </div>
+    </div>
+  </div>
+</div>

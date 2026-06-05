@@ -1,0 +1,25 @@
+<h2>工具栏功能说明</h2>
+<p class="subtitle">当前工具栏按钮的功能解释</p>
+
+<div class="mockup">
+  <div class="mockup-body">
+    <div style="display: flex; gap: 8px; padding: 8px 12px; background: #f8f8f8; border: 1px solid #ddd; align-items: center; border-radius: 4px; margin-bottom: 16px;">
+      <button class="mock-button" style="font-size: 12px; padding: 4px 16px;">连接</button>
+      <button class="mock-button" style="font-size: 12px; padding: 4px 16px;">断开</button>
+      <span style="color: #ccc;">|</span>
+      <button class="mock-button" style="font-size: 12px; padding: 4px 16px;">启动</button>
+      <button class="mock-button" style="font-size: 12px; padding: 4px 16px;">停止</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+      <div style="background: #e8f5e9; padding: 12px; border-radius: 4px;">
+        <strong style="color: #2e7d32;">连接 / 断开</strong>
+        <p style="margin: 4px 0 0; color: #555;">控制串口与硬件设备的连接状态。连接后才能进行数据通信。</p>
+      </div>
+      <div style="background: #fff3e0; padding: 12px; border-radius: 4px;">
+        <strong style="color: #e65100;">启动 / 停止</strong>
+        <p style="margin: 4px 0 0; color: #555;">控制设备运行状态。启动后开始轮询读取寄存器数据，停止后暂停数据采集。<br><em style="color: #999;">（功能已重复出现在"总览"页签中）</em></p>
+      </div>
+    </div>
+  </div>
+</div>

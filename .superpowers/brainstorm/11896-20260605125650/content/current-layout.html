@@ -1,0 +1,67 @@
+<h2>当前 GUI 界面结构</h2>
+<p class="subtitle">以下是你目前看到的软件界面布局，请确认</p>
+
+<div class="mockup">
+  <div class="mockup-header">种子源模块控制器 - v2.0</div>
+  <div class="mockup-body">
+    <!-- 菜单栏 -->
+    <div class="mock-nav" style="padding: 4px 8px; font-size: 12px; background: #f0f0f0; border-bottom: 1px solid #ddd;">
+      <span style="margin-right: 16px;">文件(F)</span>
+      <span style="margin-right: 16px;">帮助(H)</span>
+    </div>
+    
+    <!-- 工具栏 -->
+    <div style="display: flex; gap: 8px; padding: 4px 8px; background: #f8f8f8; border-bottom: 1px solid #ddd; align-items: center;">
+      <button class="mock-button" style="font-size: 11px; padding: 2px 12px;">连接</button>
+      <button class="mock-button" style="font-size: 11px; padding: 2px 12px;">断开</button>
+      <span style="color: #ddd;">|</span>
+      <button class="mock-button" style="font-size: 11px; padding: 2px 12px;">启动</button>
+      <button class="mock-button" style="font-size: 11px; padding: 2px 12px;">停止</button>
+    </div>
+
+    <!-- 串口连接面板 -->
+    <div style="padding: 6px 8px; background: #fff; border-bottom: 1px solid #eee; font-size: 11px;">
+      <span style="color: #666;">Port:</span>
+      <span class="placeholder" style="display: inline-block; width: 70px; height: 20px; margin: 0 4px;">COM1</span>
+      <span style="color: #666; margin-left: 8px;">Baud:</span>
+      <span class="placeholder" style="display: inline-block; width: 70px; height: 20px; margin: 0 4px;">115200</span>
+      <span style="color: #666; margin-left: 8px;">Data:</span>
+      <span class="placeholder" style="display: inline-block; width: 50px; height: 20px; margin: 0 4px;">8</span>
+      <span style="color: #666; margin-left: 8px;">Parity:</span>
+      <span class="placeholder" style="display: inline-block; width: 50px; height: 20px; margin: 0 4px;">None</span>
+      <span style="color: #666; margin-left: 8px;">Stop:</span>
+      <span class="placeholder" style="display: inline-block; width: 50px; height: 20px; margin: 0 4px;">1</span>
+      <span style="color: #666; margin-left: 8px;">Flow:</span>
+      <span class="placeholder" style="display: inline-block; width: 60px; height: 20px; margin: 0 4px;">None</span>
+      <button class="mock-button" style="font-size: 11px; padding: 2px 8px; margin-left: 8px;">Refresh</button>
+      <button class="mock-button" style="font-size: 11px; padding: 2px 8px;">Connect</button>
+      <span style="color: red; font-size: 11px; margin-left: 8px;">Disconnected</span>
+    </div>
+
+    <!-- 页签栏 -->
+    <div style="display: flex; border-bottom: 1px solid #ccc; background: #fafafa; font-size: 12px;">
+      <span style="padding: 6px 12px; border-bottom: 2px solid #2196F3; color: #2196F3;">总览</span>
+      <span style="padding: 6px 12px; color: #666;">电流控制</span>
+      <span style="padding: 6px 12px; color: #666;">温度控制</span>
+      <span style="padding: 6px 12px; color: #666;">功率监测</span>
+      <span style="padding: 6px 12px; color: #666;">设备配置</span>
+      <span style="padding: 6px 12px; color: #666;">报警管理</span>
+      <span style="padding: 6px 12px; color: #666;">数据统计</span>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="placeholder" style="min-height: 300px; margin: 4px;">
+      主内容区 (7个功能页签)
+    </div>
+
+    <!-- 底部日志 -->
+    <div class="placeholder" style="height: 120px; margin: 4px; background: #2d2d2d; color: #aaa; font-size: 11px; padding: 4px;">
+      日志面板 (最大高度 150px)
+    </div>
+
+    <!-- 状态栏 -->
+    <div style="padding: 2px 8px; background: #f0f0f0; border-top: 1px solid #ddd; font-size: 11px; color: #666;">
+      就绪
+    </div>
+  </div>
+</div>
