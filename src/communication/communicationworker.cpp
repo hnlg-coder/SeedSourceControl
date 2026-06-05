@@ -220,15 +220,25 @@ void CommunicationWorker::onHandshakeResult(bool success, const QVariant& result
 
     m_handshakeTimer->stop();
 
+    QSharedPointer<ICommand> cmd = m_handshakeCmd;
+    m_handshakeCmd.clear();
+
+    if (cmd) {
+        disconnect(cmd.data(), &ICommand::completed,
+                   this, &CommunicationWorker::onHandshakeResult);
+        {
+            QMutexLocker locker(&m_pendingMutex);
+            m_pendingCommands.remove(cmd->id());
+        }
+    }
+
     if (success) {
         m_connecting = false;
         m_connected = true;
-        m_handshakeCmd.clear();
 
         {
             QMutexLocker locker(&m_pendingMutex);
             m_state = Idle;
-            m_pendingCommands.clear();
         }
 
         emit connectionStateChanged(true);
@@ -237,12 +247,10 @@ void CommunicationWorker::onHandshakeResult(bool success, const QVariant& result
         m_handshakeRetries++;
         if (m_handshakeRetries < 2) {
             emit logMessage(QString("握手响应无效，重试(%1/2)...").arg(m_handshakeRetries));
-            m_handshakeCmd.clear();
             startHandshake();
         } else {
             emit logMessage(QString("握手失败: 从机无有效响应"));
             m_connecting = false;
-            m_handshakeCmd.clear();
             if (m_serialPort && m_serialPort->isOpen()) {
                 m_serialPort->close();
             }
@@ -256,12 +264,18 @@ void CommunicationWorker::onHandshakeTimeout()
     if (!m_connecting) return;
 
     m_connecting = false;
+
+    QSharedPointer<ICommand> cmd = m_handshakeCmd;
     m_handshakeCmd.clear();
 
-    {
-        QMutexLocker locker(&m_pendingMutex);
-        m_state = Idle;
-        m_pendingCommands.clear();
+    if (cmd) {
+        disconnect(cmd.data(), &ICommand::completed,
+                   this, &CommunicationWorker::onHandshakeResult);
+        {
+            QMutexLocker locker(&m_pendingMutex);
+            m_pendingCommands.remove(cmd->id());
+            m_state = Idle;
+        }
     }
 
     if (m_serialPort && m_serialPort->isOpen()) {
@@ -295,6 +309,12 @@ void CommunicationWorker::doDisconnectDevice()
         }
         {
             QMutexLocker locker(&m_pendingMutex);
+            for (auto it = m_pendingCommands.begin(); it != m_pendingCommands.end(); ++it) {
+                disconnect(it.value().data(), &ICommand::sendRequest,
+                           this, &CommunicationWorker::sendNextRequest);
+                disconnect(it.value().data(), &ICommand::completed,
+                           this, &CommunicationWorker::onCommandCompleted);
+            }
             m_pendingCommands.clear();
             m_state = Idle;
         }

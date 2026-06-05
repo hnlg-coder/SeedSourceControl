@@ -25,6 +25,17 @@ set(SOURCES
     src/communication/command.cpp
     src/communication/communicationworker.h
     src/communication/communicationworker.cpp
+
+    src/simulator/simregistermanager.h
+    src/simulator/simregistermanager.cpp
+    src/simulator/simdevicestatemachine.h
+    src/simulator/simdevicestatemachine.cpp
+    src/simulator/simprotocolhandler.h
+    src/simulator/simprotocolhandler.cpp
+    src/simulator/simulatorcore.h
+    src/simulator/simulatorcore.cpp
+    src/simulator/simulationworker.h
+    src/simulator/simulationworker.cpp
     
     src/model/devicedatamodel.h
     src/model/devicedatamodel.cpp
@@ -83,7 +94,13 @@ set(HEADERS
     
     src/communication/command.h
     src/communication/communicationworker.h
-    
+
+    src/simulator/simregistermanager.h
+    src/simulator/simdevicestatemachine.h
+    src/simulator/simprotocolhandler.h
+    src/simulator/simulatorcore.h
+    src/simulator/simulationworker.h
+
     src/model/devicedatamodel.h
     
     src/visualization/realtimeplotwidget.h

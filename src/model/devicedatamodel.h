@@ -7,6 +7,7 @@
 #include <QReadWriteLock>
 #include <QTimer>
 #include <QStringList>
+#include <atomic>
 #include "../protocol/registermanager.h"
 
 /**
@@ -333,7 +334,7 @@ private:
     mutable QReadWriteLock m_dataLock;
     QScopedPointer<DataCache> m_dataCache;
 
-    quint32 m_lastAlarm;
+    std::atomic<quint32> m_lastAlarm{0};
     void checkAlarms(const RealTimeData& data);
 };
 

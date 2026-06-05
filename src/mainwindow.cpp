@@ -23,6 +23,7 @@
 #include "config/configmanager.h"
 #include "database/databasemanager.h"
 #include "alarm/alarmmanager.h"
+#include "simulator/simulationworker.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -41,6 +42,9 @@ MainWindow::MainWindow(QWidget* parent)
     , m_dataTablePanel(nullptr)
     , m_connected(false)
     , m_running(false)
+    , m_simulationWorker(nullptr)
+    , m_simulationMode(false)
+    , m_simAction(nullptr)
 {
     setupUI();
     createMenus();
@@ -69,6 +73,13 @@ MainWindow::~MainWindow()
         m_communicationWorker->wait();
         delete m_communicationWorker;
         m_communicationWorker = nullptr;
+    }
+
+    if (m_simulationWorker) {
+        m_simulationWorker->stopCommunication();
+        disconnect(m_simulationWorker, nullptr, this, nullptr);
+        delete m_simulationWorker;
+        m_simulationWorker = nullptr;
     }
 
     DatabaseManager::instance()->close();
@@ -164,6 +175,14 @@ void MainWindow::createMenus()
     connect(exitAction, &QAction::triggered, this, &QMainWindow::close);
     fileMenu->addAction(exitAction);
 
+    QMenu* debugMenu = menuBar()->addMenu(tr("调试(&D)"));
+
+    m_simAction = new QAction(tr("仿真模式(&S)"), this);
+    m_simAction->setCheckable(true);
+    m_simAction->setChecked(false);
+    connect(m_simAction, &QAction::triggered, this, &MainWindow::toggleSimulationMode);
+    debugMenu->addAction(m_simAction);
+
     QMenu* helpMenu = menuBar()->addMenu(tr("帮助(&H)"));
 
     QAction* aboutAction = new QAction(tr("关于(&A)"), this);
@@ -183,6 +202,9 @@ void MainWindow::initializeComponents()
     m_dataModel = new DeviceDataModel(this);
     m_communicationWorker = new CommunicationWorker(this);
     m_communicationWorker->setProtocolParser(m_protocolParser);
+
+    m_simulationWorker = new SimulationWorker(this);
+    m_simulationWorker->setProtocolParser(m_protocolParser);
 
     // 注册跨线程信号槽传递的类型
     qRegisterMetaType<QSharedPointer<ICommand>>("QSharedPointer<ICommand>");
@@ -225,29 +247,19 @@ void MainWindow::connectSignals()
             this, &MainWindow::onConnectionStateChanged);
     connect(m_communicationWorker, &CommunicationWorker::logMessage,
             this, &MainWindow::onLogMessage);
+    connect(m_communicationWorker, &CommunicationWorker::commandCompleted,
+            this, &MainWindow::onCommandCompleted);
+
+    // 仿真工作线程信号
+    connect(m_simulationWorker, &SimulationWorker::connectionStateChanged,
+            this, &MainWindow::onConnectionStateChanged);
+    connect(m_simulationWorker, &SimulationWorker::logMessage,
+            this, &MainWindow::onLogMessage);
+    connect(m_simulationWorker, &SimulationWorker::commandCompleted,
+            this, &MainWindow::onCommandCompleted);
 
     // 命令完成信号 -> 更新数据模型
-    connect(m_communicationWorker, &CommunicationWorker::commandCompleted,
-            this, [this](quint32 cmdId, bool success, QVariant result) {
-        Q_UNUSED(cmdId);
-        if (success && result.isValid()) {
-            QVariantMap statusMap = result.toMap();
-
-            // 从ReadStatusCommand响应中提取原始寄存器值
-            double current = statusMap.value("current", 0).toDouble();
-            double temperature = statusMap.value("temperature", 0).toDouble();
-            double power = statusMap.value("power", 0).toDouble();
-            quint32 status = statusMap.value("status", 0).toUInt();
-            quint32 alarm = statusMap.value("alarm", 0).toUInt();
-
-            // 值域转换（假设协议中单位为0.01mA, 0.001°C, 0.01mW）
-            double currentVal = current / 100.0;
-            double tempVal = temperature / 1000.0;
-            double powerLas = power / 100.0;
-
-            m_dataModel->updateData(currentVal, tempVal, powerLas, status, alarm);
-        }
-    });
+    // (handled via onCommandCompleted slot, connected above)
 
     // 数据模型信号 -> UI更新
     connect(m_dataModel, &DeviceDataModel::dataUpdated, this, [this](const DeviceDataModel::RealTimeData& data) {
@@ -287,6 +299,13 @@ void MainWindow::connectSignals()
 
 void MainWindow::onConnectClicked()
 {
+    if (m_simulationMode) {
+        m_simulationWorker->startCommunication();
+        m_simulationWorker->connectDevice();
+        m_logPanel->logMessage(tr("仿真模式: 连接虚拟设备"), LogPanel::Info);
+        return;
+    }
+
     QString portName = m_connectionPanel->selectedPort();
     qint32 baudRate = m_connectionPanel->selectedBaudRate();
     QSerialPort::DataBits dataBits = m_connectionPanel->selectedDataBits();
@@ -308,7 +327,11 @@ void MainWindow::onDisconnectClicked()
         onStopClicked();
     }
 
-    m_communicationWorker->disconnectDevice();
+    if (m_simulationMode) {
+        m_simulationWorker->disconnectDevice();
+    } else {
+        m_communicationWorker->disconnectDevice();
+    }
     m_logPanel->logMessage(tr("设备断开连接"), LogPanel::Info);
 }
 
@@ -323,7 +346,7 @@ void MainWindow::onStartClicked()
     m_pollTimer->start();
 
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Start, m_protocolParser);
-    m_communicationWorker->sendCommand(command);
+    sendCommand(command);
 
     m_logPanel->logMessage(tr("设备启动"), LogPanel::Info);
     statusBar()->showMessage(tr("运行中..."));
@@ -335,7 +358,7 @@ void MainWindow::onStopClicked()
     m_pollTimer->stop();
 
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Stop, m_protocolParser);
-    m_communicationWorker->sendCommand(command);
+    sendCommand(command);
 
     m_logPanel->logMessage(tr("设备停止"), LogPanel::Info);
     statusBar()->showMessage(tr("已停止"));
@@ -344,7 +367,7 @@ void MainWindow::onStopClicked()
 void MainWindow::onResetClicked()
 {
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Reset, m_protocolParser);
-    m_communicationWorker->sendCommand(command);
+    sendCommand(command);
 
     m_logPanel->logMessage(tr("设备重置"), LogPanel::Info);
 }
@@ -352,7 +375,7 @@ void MainWindow::onResetClicked()
 void MainWindow::onCalibrateClicked()
 {
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Calibrate, m_protocolParser);
-    m_communicationWorker->sendCommand(command);
+    sendCommand(command);
 
     m_logPanel->logMessage(tr("设备校准"), LogPanel::Info);
 }
@@ -361,7 +384,7 @@ void MainWindow::onCurrentSetChanged(double value)
 {
     if (m_connected && m_running) {
         auto command = CommandFactory::createWriteRegisterCommand(0x02, 0x00, static_cast<quint32>(value * 100), m_protocolParser);
-        m_communicationWorker->sendCommand(command);
+        sendCommand(command);
 
         m_logPanel->logMessage(tr("设置目标电流: %1 mA").arg(value), LogPanel::Info);
     }
@@ -371,7 +394,7 @@ void MainWindow::onTemperatureSetChanged(double value)
 {
     if (m_connected && m_running) {
         auto command = CommandFactory::createWriteRegisterCommand(0x03, 0x00, static_cast<quint32>(value * 1000), m_protocolParser);
-        m_communicationWorker->sendCommand(command);
+        sendCommand(command);
 
         m_logPanel->logMessage(tr("设置目标温度: %1 °C").arg(value), LogPanel::Info);
     }
@@ -392,7 +415,7 @@ void MainWindow::onConfigChanged()
 
     if (m_connected) {
         auto command = CommandFactory::createWriteRegisterCommand(0x05, 0x00, configReg, m_protocolParser);
-        m_communicationWorker->sendCommand(command);
+        sendCommand(command);
         m_logPanel->logMessage(
             tr("配置已更新: TC_EN=%1 CC_EN=%2 AE_EN=%3").arg(cfg.tcEn).arg(cfg.ccEn).arg(cfg.aeEn),
             LogPanel::Info);
@@ -467,5 +490,45 @@ void MainWindow::pollDevice()
 
     // 发送读状态命令获取所有寄存器数据
     auto command = CommandFactory::createReadStatusCommand(m_protocolParser);
-    m_communicationWorker->sendCommand(command);
+    sendCommand(command);
+}
+
+void MainWindow::onCommandCompleted(quint32 cmdId, bool success, QVariant result)
+{
+    Q_UNUSED(cmdId);
+    if (success && result.isValid()) {
+        QVariantMap statusMap = result.toMap();
+
+        double current = statusMap.value("current", 0).toDouble();
+        double temperature = statusMap.value("temperature", 0).toDouble();
+        double power = statusMap.value("power", 0).toDouble();
+        quint32 status = statusMap.value("status", 0).toUInt();
+        quint32 alarm = statusMap.value("alarm", 0).toUInt();
+
+        double currentVal = current / 100.0;
+        double tempVal = temperature / 1000.0;
+        double powerLas = power / 100.0;
+
+        m_dataModel->updateData(currentVal, tempVal, powerLas, status, alarm);
+    }
+}
+
+void MainWindow::sendCommand(QSharedPointer<ICommand> cmd)
+{
+    if (m_simulationMode) {
+        m_simulationWorker->sendCommand(cmd);
+    } else {
+        m_communicationWorker->sendCommand(cmd);
+    }
+}
+
+void MainWindow::toggleSimulationMode()
+{
+    m_simulationMode = m_simAction->isChecked();
+    m_logPanel->logMessage(
+        m_simulationMode ? tr("切换至仿真模式") : tr("切换至实物模式"),
+        LogPanel::Info);
+    statusBar()->showMessage(
+        m_simulationMode ? tr("仿真模式 - 无需物理连接") : tr("实物模式"));
+    m_connectionPanel->setEnabled(!m_simulationMode);
 }

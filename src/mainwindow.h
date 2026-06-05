@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QTabWidget>
 #include <QPropertyAnimation>
+#include <QSharedPointer>
 #include <atomic>
 
 class ConnectionPanel;
@@ -19,7 +20,9 @@ class AlertWidget;
 class DataTablePanel;
 class SeedSourceProtocolParser;
 class CommunicationWorker;
+class SimulationWorker;
 class DeviceDataModel;
+class ICommand;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -52,6 +55,9 @@ private:
     void connectSignals();
     void initializeComponents();
     void toggleDrawer();
+    void toggleSimulationMode();
+    void sendCommand(QSharedPointer<ICommand> cmd);
+    void onCommandCompleted(quint32 cmdId, bool success, QVariant result);
 
     ConnectionStatusBar* m_connectionStatusBar;
     QWidget* m_connectionDrawer;
@@ -84,6 +90,11 @@ private:
     QTimer* m_pollTimer;
     std::atomic<bool> m_connected;
     std::atomic<bool> m_running;
+
+    // 仿真模式
+    QAction* m_simAction;
+    bool m_simulationMode;
+    SimulationWorker* m_simulationWorker;
 };
 
 #endif // MAINWINDOW_H
