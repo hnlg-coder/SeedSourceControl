@@ -174,3 +174,31 @@ if(WIN32)
         message(WARNING "windeployqt not found, automatic deployment disabled")
     endif()
 endif()
+
+set(SIM_TEST_SOURCES
+    src/protocol/protocolparser.h
+    src/protocol/protocolparser.cpp
+
+    src/simulator/simregistermanager.h
+    src/simulator/simregistermanager.cpp
+    src/simulator/simdevicestatemachine.h
+    src/simulator/simdevicestatemachine.cpp
+    src/simulator/simprotocolhandler.h
+    src/simulator/simprotocolhandler.cpp
+    src/simulator/simulatorcore.h
+    src/simulator/simulatorcore.cpp
+    src/simulator/faultinjector.h
+    src/simulator/faultinjector.cpp
+
+    tests/test_simulation.cpp
+)
+
+add_executable(TestSimulation ${SIM_TEST_SOURCES})
+
+target_link_libraries(TestSimulation PRIVATE
+    Qt6::Core
+)
+
+target_include_directories(TestSimulation PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
