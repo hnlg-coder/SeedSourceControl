@@ -36,6 +36,8 @@ set(SOURCES
     src/simulator/simulatorcore.cpp
     src/simulator/simulationworker.h
     src/simulator/simulationworker.cpp
+    src/simulator/faultinjector.h
+    src/simulator/faultinjector.cpp
     
     src/model/devicedatamodel.h
     src/model/devicedatamodel.cpp
@@ -100,6 +102,7 @@ set(HEADERS
     src/simulator/simprotocolhandler.h
     src/simulator/simulatorcore.h
     src/simulator/simulationworker.h
+    src/simulator/faultinjector.h
 
     src/model/devicedatamodel.h
     

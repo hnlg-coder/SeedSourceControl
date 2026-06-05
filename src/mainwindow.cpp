@@ -24,6 +24,8 @@
 #include "database/databasemanager.h"
 #include "alarm/alarmmanager.h"
 #include "simulator/simulationworker.h"
+#include "simulator/simdevicestatemachine.h"
+#include "simulator/faultinjector.h"
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -45,6 +47,16 @@ MainWindow::MainWindow(QWidget* parent)
     , m_simulationWorker(nullptr)
     , m_simulationMode(false)
     , m_simAction(nullptr)
+    , m_simPanel(nullptr)
+    , m_faultEnable(nullptr)
+    , m_faultDropRate(nullptr)
+    , m_faultCorruptRate(nullptr)
+    , m_faultDelay(nullptr)
+    , m_faultCheckSum(nullptr)
+    , m_simSlewRate(nullptr)
+    , m_simNoise(nullptr)
+    , m_simStartupDelay(nullptr)
+    , m_simTempLag(nullptr)
 {
     setupUI();
     createMenus();
@@ -531,4 +543,156 @@ void MainWindow::toggleSimulationMode()
     statusBar()->showMessage(
         m_simulationMode ? tr("仿真模式 - 无需物理连接") : tr("实物模式"));
     m_connectionPanel->setEnabled(!m_simulationMode);
+
+    if (!m_simPanel) {
+        setupSimulationPanel();
+    }
+    m_simPanel->setVisible(m_simulationMode);
+}
+
+void MainWindow::setupSimulationPanel()
+{
+    m_simPanel = new QWidget(this);
+    m_simPanel->setStyleSheet(
+        "QWidget#simPanel { background: #e8f4fd; border-bottom: 1px solid #b8d8ea; }");
+
+    QHBoxLayout* panelLayout = new QHBoxLayout(m_simPanel);
+    panelLayout->setContentsMargins(8, 4, 8, 4);
+    panelLayout->setSpacing(12);
+
+    QGroupBox* faultGroup = new QGroupBox(tr("故障注入"));
+    QGridLayout* faultLayout = new QGridLayout(faultGroup);
+
+    m_faultEnable = new QCheckBox(tr("启用故障注入"));
+    faultLayout->addWidget(m_faultEnable, 0, 0, 1, 2);
+
+    faultLayout->addWidget(new QLabel(tr("丢帧率:")), 1, 0);
+    m_faultDropRate = new QSlider(Qt::Horizontal);
+    m_faultDropRate->setRange(0, 100);
+    m_faultDropRate->setValue(0);
+    m_faultDropRate->setTickPosition(QSlider::TicksBelow);
+    m_faultDropRate->setTickInterval(10);
+    faultLayout->addWidget(m_faultDropRate, 1, 1);
+
+    faultLayout->addWidget(new QLabel(tr("数据损坏率:")), 2, 0);
+    m_faultCorruptRate = new QSlider(Qt::Horizontal);
+    m_faultCorruptRate->setRange(0, 100);
+    m_faultCorruptRate->setValue(0);
+    m_faultCorruptRate->setTickPosition(QSlider::TicksBelow);
+    m_faultCorruptRate->setTickInterval(10);
+    faultLayout->addWidget(m_faultCorruptRate, 2, 1);
+
+    faultLayout->addWidget(new QLabel(tr("响应延迟:")), 3, 0);
+    m_faultDelay = new QSlider(Qt::Horizontal);
+    m_faultDelay->setRange(0, 500);
+    m_faultDelay->setValue(0);
+    m_faultDelay->setTickPosition(QSlider::TicksBelow);
+    m_faultDelay->setTickInterval(50);
+    faultLayout->addWidget(m_faultDelay, 3, 1);
+
+    m_faultCheckSum = new QCheckBox(tr("校验和错误"));
+    faultLayout->addWidget(m_faultCheckSum, 4, 0, 1, 2);
+
+    panelLayout->addWidget(faultGroup);
+
+    QGroupBox* paramGroup = new QGroupBox(tr("仿真参数"));
+    QGridLayout* paramLayout = new QGridLayout(paramGroup);
+
+    paramLayout->addWidget(new QLabel(tr("电流摆率:")), 0, 0);
+    m_simSlewRate = new QSlider(Qt::Horizontal);
+    m_simSlewRate->setRange(1, 100);
+    m_simSlewRate->setValue(10);
+    m_simSlewRate->setTickPosition(QSlider::TicksBelow);
+    m_simSlewRate->setTickInterval(10);
+    paramLayout->addWidget(m_simSlewRate, 0, 1);
+
+    paramLayout->addWidget(new QLabel(tr("噪声幅值:")), 1, 0);
+    m_simNoise = new QSlider(Qt::Horizontal);
+    m_simNoise->setRange(0, 200);
+    m_simNoise->setValue(20);
+    m_simNoise->setTickPosition(QSlider::TicksBelow);
+    m_simNoise->setTickInterval(20);
+    paramLayout->addWidget(m_simNoise, 1, 1);
+
+    paramLayout->addWidget(new QLabel(tr("启动延迟:")), 2, 0);
+    m_simStartupDelay = new QSlider(Qt::Horizontal);
+    m_simStartupDelay->setRange(100, 10000);
+    m_simStartupDelay->setValue(2000);
+    m_simStartupDelay->setTickPosition(QSlider::TicksBelow);
+    m_simStartupDelay->setTickInterval(1000);
+    paramLayout->addWidget(m_simStartupDelay, 2, 1);
+
+    paramLayout->addWidget(new QLabel(tr("温度滞后:")), 3, 0);
+    m_simTempLag = new QSlider(Qt::Horizontal);
+    m_simTempLag->setRange(1, 50);
+    m_simTempLag->setValue(5);
+    m_simTempLag->setTickPosition(QSlider::TicksBelow);
+    m_simTempLag->setTickInterval(5);
+    paramLayout->addWidget(m_simTempLag, 3, 1);
+
+    panelLayout->addWidget(paramGroup);
+    panelLayout->addStretch();
+
+    QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
+    if (mainLayout) {
+        int statusBarIdx = mainLayout->indexOf(m_connectionStatusBar);
+        mainLayout->insertWidget(statusBarIdx + 1, m_simPanel);
+    }
+
+    m_simPanel->setVisible(false);
+
+    connect(m_faultEnable, &QCheckBox::toggled, this, [this](bool checked) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
+            if (fi) fi->setEnabled(checked);
+        }
+    });
+    connect(m_faultDropRate, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
+            if (fi) fi->setDropRate(v / 100.0);
+        }
+    });
+    connect(m_faultCorruptRate, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
+            if (fi) fi->setCorruptRate(v / 100.0);
+        }
+    });
+    connect(m_faultDelay, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
+            if (fi) fi->setResponseDelay(v * 10);
+        }
+    });
+    connect(m_faultCheckSum, &QCheckBox::toggled, this, [this](bool checked) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            FaultInjector* fi = m_simulationWorker->simulatorCore()->faultInjector();
+            if (fi) fi->setWrongChecksum(checked);
+        }
+    });
+    connect(m_simSlewRate, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
+            if (sm) sm->setCurrentSlewRate(v / 100.0);
+        }
+    });
+    connect(m_simNoise, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
+            if (sm) sm->setNoiseAmplitude(v / 1000.0);
+        }
+    });
+    connect(m_simStartupDelay, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
+            if (sm) sm->setStartupDelayMs(v);
+        }
+    });
+    connect(m_simTempLag, &QSlider::valueChanged, this, [this](int v) {
+        if (m_simulationWorker && m_simulationWorker->isConnected()) {
+            SimDeviceStateMachine* sm = m_simulationWorker->simulatorCore()->stateMachine();
+            if (sm) sm->setTempResponseLag(v / 100.0);
+        }
+    });
 }

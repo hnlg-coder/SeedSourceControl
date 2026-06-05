@@ -17,6 +17,7 @@ public:
 
     void setProtocolParser(IProtocolParser* parser);
     bool isConnected() const { return m_connected; }
+    SimulatorCore* simulatorCore() const { return m_simulatorCore; }
 
 signals:
     void dataReceived(const QByteArray& data);

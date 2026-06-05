@@ -6,6 +6,7 @@
 #include "simregistermanager.h"
 #include "simdevicestatemachine.h"
 #include "simprotocolhandler.h"
+#include "faultinjector.h"
 
 class SimulatorCore : public QObject {
     Q_OBJECT
@@ -29,9 +30,13 @@ public:
     quint32 statusValue() const;
     quint32 alarmValue() const;
 
+    SimDeviceStateMachine* stateMachine() const { return m_stateMachine; }
+    FaultInjector* faultInjector() const { return m_faultInjector; }
+
 signals:
     void dataUpdated(double current, double temperature, double power);
     void logMessage(const QString& message);
+    void faultInjected(const QString& description);
 
 private slots:
     void onStateDataUpdated(double current, double temperature, double power);
@@ -40,6 +45,7 @@ private:
     SimRegisterManager* m_regMgr;
     SimDeviceStateMachine* m_stateMachine;
     SimProtocolHandler* m_protocolHandler;
+    FaultInjector* m_faultInjector;
 
     double m_currentReading;
     double m_temperatureReading;

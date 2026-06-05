@@ -15,6 +15,10 @@ SimDeviceStateMachine::SimDeviceStateMachine(SimRegisterManager* regMgr, QObject
     , m_noisePower(0)
     , m_simulationTimer(nullptr)
     , m_startTimestamp(0)
+    , m_currentSlewRate(0.1)
+    , m_noiseAmplitude(0.02)
+    , m_startupDelayMs(2000)
+    , m_tempResponseLag(0.05)
 {
 }
 
@@ -72,7 +76,7 @@ void SimDeviceStateMachine::updateSimulation()
 {
     if (m_state == Starting) {
         qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - m_startTimestamp;
-        if (elapsed >= 2000) {
+        if (elapsed >= m_startupDelayMs) {
             m_state = Running;
             writeStatusRegister(Running);
             emit logMessage(QStringLiteral("Device state: Running"));
@@ -108,20 +112,20 @@ void SimDeviceStateMachine::updateSimulation()
     double tempNoise = m_rng.bounded(100) / 1000.0;
 
     double currentDelta = targetCurrent - m_currentReading;
-    double currentSlew = currentDelta * 0.1;
+    double currentSlew = currentDelta * m_currentSlewRate;
     m_currentReading += currentSlew;
 
     double tempDelta = targetTemp - m_temperatureReading;
-    double tempSlew = tempDelta * 0.05;
+    double tempSlew = tempDelta * m_tempResponseLag;
     m_temperatureReading += tempSlew;
 
     m_currentReading = std::max(0.0, m_currentReading + currentNoise * 0.01);
     m_temperatureReading = std::max(20.0, m_temperatureReading + tempNoise * 0.01);
     m_powerReading = m_currentReading * m_temperatureReading * 0.01;
 
-    double curNoiseMag = m_currentReading * 0.02;
-    double tempNoiseMag = m_temperatureReading * 0.005;
-    double pwrNoiseMag = m_powerReading * 0.03;
+    double curNoiseMag = m_currentReading * m_noiseAmplitude;
+    double tempNoiseMag = m_temperatureReading * m_noiseAmplitude * 0.25;
+    double pwrNoiseMag = m_powerReading * m_noiseAmplitude * 1.5;
 
     m_noiseCurrent = m_rng.bounded(static_cast<int>(curNoiseMag * 100)) / 100.0;
     m_noiseTemp = m_rng.bounded(static_cast<int>(tempNoiseMag * 100)) / 100.0;
@@ -165,4 +169,44 @@ void SimDeviceStateMachine::writeStatusRegister(DeviceState state)
         case Error:    statusVal = 0x00000010; break;
     }
     m_regMgr->writeRaw(0x00, 0x00, statusVal);
+}
+
+void SimDeviceStateMachine::setCurrentSlewRate(double v)
+{
+    if (v < 0.01) v = 0.01;
+    if (v > 1.0) v = 1.0;
+    if (m_currentSlewRate != v) {
+        m_currentSlewRate = v;
+        emit currentSlewRateChanged(v);
+    }
+}
+
+void SimDeviceStateMachine::setNoiseAmplitude(double v)
+{
+    if (v < 0) v = 0;
+    if (v > 0.2) v = 0.2;
+    if (m_noiseAmplitude != v) {
+        m_noiseAmplitude = v;
+        emit noiseAmplitudeChanged(v);
+    }
+}
+
+void SimDeviceStateMachine::setStartupDelayMs(int ms)
+{
+    if (ms < 100) ms = 100;
+    if (ms > 10000) ms = 10000;
+    if (m_startupDelayMs != ms) {
+        m_startupDelayMs = ms;
+        emit startupDelayMsChanged(ms);
+    }
+}
+
+void SimDeviceStateMachine::setTempResponseLag(double v)
+{
+    if (v < 0.01) v = 0.01;
+    if (v > 0.5) v = 0.5;
+    if (m_tempResponseLag != v) {
+        m_tempResponseLag = v;
+        emit tempResponseLagChanged(v);
+    }
 }

@@ -5,6 +5,7 @@ SimulatorCore::SimulatorCore(QObject* parent)
     , m_regMgr(nullptr)
     , m_stateMachine(nullptr)
     , m_protocolHandler(nullptr)
+    , m_faultInjector(nullptr)
     , m_currentReading(0)
     , m_temperatureReading(0)
     , m_powerReading(0)
@@ -32,6 +33,12 @@ void SimulatorCore::initialize()
     connect(m_protocolHandler, &SimProtocolHandler::logMessage,
             this, &SimulatorCore::logMessage);
 
+    m_faultInjector = new FaultInjector(this);
+    connect(m_faultInjector, &FaultInjector::logMessage,
+            this, &SimulatorCore::logMessage);
+    connect(m_faultInjector, &FaultInjector::faultInjected,
+            this, &SimulatorCore::faultInjected);
+
     m_simulating = false;
     m_currentReading = 0;
     m_temperatureReading = 0;
@@ -57,7 +64,11 @@ QByteArray SimulatorCore::handleFrame(const QByteArray& request)
     if (!m_protocolHandler) {
         return QByteArray();
     }
-    return m_protocolHandler->handleFrame(request);
+    QByteArray response = m_protocolHandler->handleFrame(request);
+    if (m_faultInjector) {
+        response = m_faultInjector->process(response);
+    }
+    return response;
 }
 
 void SimulatorCore::startSimulation()

@@ -4,6 +4,9 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QTabWidget>
+#include <QSlider>
+#include <QCheckBox>
+#include <QGroupBox>
 #include <QPropertyAnimation>
 #include <QSharedPointer>
 #include <atomic>
@@ -56,6 +59,7 @@ private:
     void initializeComponents();
     void toggleDrawer();
     void toggleSimulationMode();
+    void setupSimulationPanel();
     void sendCommand(QSharedPointer<ICommand> cmd);
     void onCommandCompleted(quint32 cmdId, bool success, QVariant result);
 
@@ -95,6 +99,17 @@ private:
     QAction* m_simAction;
     bool m_simulationMode;
     SimulationWorker* m_simulationWorker;
+
+    QWidget* m_simPanel;
+    QCheckBox* m_faultEnable;
+    QSlider* m_faultDropRate;
+    QSlider* m_faultCorruptRate;
+    QSlider* m_faultDelay;
+    QCheckBox* m_faultCheckSum;
+    QSlider* m_simSlewRate;
+    QSlider* m_simNoise;
+    QSlider* m_simStartupDelay;
+    QSlider* m_simTempLag;
 };
 
 #endif // MAINWINDOW_H
