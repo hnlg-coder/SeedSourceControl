@@ -15,9 +15,11 @@ void SimRegisterManager::initialize()
 
     // CUR register [0x02:0x00] - current set point (raw: 0.01mA units)
     m_registers[{0x02, 0x00}] = 0;
+    m_registers[{0x02, 0x01}] = 0;
 
     // TEMP register [0x03:0x00] - temperature set point (raw: 0.001 C units)
     m_registers[{0x03, 0x00}] = 0;
+    m_registers[{0x03, 0x01}] = 0;
 
     // POWER register [0x04:0x00] - power reading (raw: 0.01mW units)
     m_registers[{0x04, 0x00}] = 0;

@@ -28,6 +28,16 @@ static int g_failed = 0;
 #define CHECK(cond, msg) \
     do { if (cond) { PASS(); } else { FAIL(msg); } } while(0)
 
+static void processEventsFor(int ms)
+{
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QThread::msleep(std::min(10, ms - static_cast<int>(timer.elapsed())));
+    }
+}
+
 // ─── Frame building helpers ───────────────────────────────────────────
 
 static const quint8 FRAME_HEADER = 0xAA;
@@ -197,8 +207,8 @@ static void testSimulatorCoreProtocol()
     resp = core.handleFrame(writeCur);
     TEST("write CUR setpoint 300mA returns success");
     CHECK(!resp.isEmpty(), "write response should not be empty");
-    if (resp.size() >= 6) {
-        quint8 status = static_cast<quint8>(resp[5]);
+    if (resp.size() >= 9) {
+        quint8 status = static_cast<quint8>(resp[6]);
         CHECK(status == 0x00, "write response status should be 0x00");
     }
 
@@ -252,14 +262,14 @@ static void testSimulatorCoreStateMachine()
           "should be Idle before simulation starts");
 
     core.startSimulation();
-    QThread::msleep(50);
+    processEventsFor(50);
 
     TEST("simulation running keeps Idle without start command");
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Idle,
           "should stay Idle until start() is called");
 
     core.stateMachine()->start();
-    QThread::msleep(100);
+    processEventsFor(100);
 
     quint32 stateAfterStart = core.statusValue();
     TEST("start() transitions to Starting");
@@ -267,7 +277,7 @@ static void testSimulatorCoreStateMachine()
     CHECK(isStartingOrRunning, "should be Starting or Running after start()");
 
     core.stateMachine()->stop();
-    QThread::msleep(100);
+    processEventsFor(100);
 
     TEST("stop() transitions to Stopping or Idle");
     quint32 stateAfterStop = core.statusValue();
@@ -328,8 +338,12 @@ static void testProtocolBoundary()
     raw1.append(static_cast<char>(calcChecksum(raw1)));
     raw1.append(static_cast<char>(FRAME_TAIL));
     QByteArray resp1 = core.handleFrame(raw1);
-    CHECK(resp1.isEmpty() && raw1.size() != 6 + 10,
-          "dataLength mismatch: declared 10, actual payload 1 → should be empty");
+    CHECK(!resp1.isEmpty() && resp1.size() >= 7,
+          "dataLength too large (declared 10, actual 1) should return error frame");
+    if (resp1.size() >= 7) {
+        CHECK(static_cast<quint8>(resp1[4]) == 0x05,
+              "error code should be ERROR_INVALID_FRAME (0x05)");
+    }
 
     TEST("frame with dataLength too small");
     QByteArray bigPayload(5, '\x00');
@@ -342,8 +356,12 @@ static void testProtocolBoundary()
     raw2.append(static_cast<char>(calcChecksum(raw2)));
     raw2.append(static_cast<char>(FRAME_TAIL));
     QByteArray resp2 = core.handleFrame(raw2);
-    CHECK(resp2.isEmpty() && raw2.size() != 6 + 2,
-          "dataLength mismatch: declared 2, actual payload 5 → should be empty");
+    CHECK(!resp2.isEmpty() && resp2.size() >= 7,
+          "dataLength too small (declared 2, actual 5) should return error frame");
+    if (resp2.size() >= 7) {
+        CHECK(static_cast<quint8>(resp2[4]) == 0x05,
+              "error code should be ERROR_INVALID_FRAME (0x05)");
+    }
 
     // --- Wrong checksum ---
     TEST("frame with wrong checksum returns error frame");
@@ -555,12 +573,12 @@ static void testStateMachineFullLifecycle()
 
     core.stateMachine()->start();
     TEST("lifecycle: after start(), state is Starting");
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Starting,
           "should be Starting right after start()");
     CHECK(core.statusValue() == 0x00000002, "status register should be 0x02 (Starting)");
 
-    QThread::msleep(2100);
+    processEventsFor(2100);
     TEST("lifecycle: after startupDelayMs (~2000ms), state is Running");
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Running,
           "should transition to Running after delay");
@@ -568,12 +586,12 @@ static void testStateMachineFullLifecycle()
 
     core.stateMachine()->stop();
     TEST("lifecycle: after stop(), state is Stopping");
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Stopping,
           "should be Stopping right after stop()");
     CHECK(core.statusValue() == 0x00000008, "status register should be 0x08 (Stopping)");
 
-    QThread::msleep(1600);
+    processEventsFor(1600);
     TEST("lifecycle: after stop delay (~1500ms), state is Idle");
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Idle,
           "should return to Idle after stopping completes");
@@ -667,7 +685,7 @@ static void testRegisterReadWriteLoop()
         TEST(buf);
         QByteArray wf = buildWriteRegisterFrame(DEV_ADDR, 0x07, devInfoRegs[i].offset, newValues[i]);
         QByteArray wr = core.handleFrame(wf);
-        bool writeOk = !wr.isEmpty() && wr.size() >= 6 && static_cast<quint8>(wr[5]) == 0x00;
+        bool writeOk = !wr.isEmpty() && wr.size() >= 9 && static_cast<quint8>(wr[6]) == 0x00;
         CHECK(writeOk, "write should return success status 0x00");
     }
 
@@ -772,8 +790,8 @@ static void testWriteRegisterBoundary()
     QByteArray wf = buildWriteRegisterFrame(DEV_ADDR, 0x08, 0x00, 0xDEADBEEF);
     QByteArray resp = core.handleFrame(wf);
     CHECK(!resp.isEmpty(), "write to 0x08:0x00 should return a frame");
-    if (resp.size() >= 6) {
-        quint8 status = static_cast<quint8>(resp[5]);
+    if (resp.size() >= 9) {
+        quint8 status = static_cast<quint8>(resp[6]);
         CHECK(status == 0x00, "simulator writeRegister always succeeds → status 0x00");
     }
 
@@ -781,35 +799,39 @@ static void testWriteRegisterBoundary()
     QByteArray wf2 = buildWriteRegisterFrame(DEV_ADDR, 0x08, 0xFF, 0xAAAAAAAA);
     QByteArray resp2 = core.handleFrame(wf2);
     CHECK(!resp2.isEmpty(), "write to 0x08:0xFF should return a frame");
-    if (resp2.size() >= 6) {
-        quint8 status2 = static_cast<quint8>(resp2[5]);
+    if (resp2.size() >= 9) {
+        quint8 status2 = static_cast<quint8>(resp2[6]);
         CHECK(status2 == 0x00, "simulator writeRegister always succeeds → status 0x00");
+    }
+
+    TEST("read invalid register 0x08:0x00 returns error");
+    {
+        SimulatorCore core2;
+        core2.initialize();
+        QByteArray rf = buildReadRegisterFrame(DEV_ADDR, 0x08, 0x00);
+        QByteArray rresp = core2.handleFrame(rf);
+        CHECK(!rresp.isEmpty(), "read invalid register should return error frame");
+        if (rresp.size() >= 7) {
+            quint8 errCode = static_cast<quint8>(rresp[4]);
+            CHECK(errCode == 0x03, "error code should be ERROR_INVALID_DATA (0x03)");
+        }
     }
 
     TEST("write to invalid register 0x00:0xFF");
     QByteArray wf3 = buildWriteRegisterFrame(DEV_ADDR, 0x00, 0xFF, 0x12345678);
     QByteArray resp3 = core.handleFrame(wf3);
     CHECK(!resp3.isEmpty(), "write to 0x00:0xFF should return a frame");
-    if (resp3.size() >= 6) {
-        quint8 status3 = static_cast<quint8>(resp3[5]);
+    if (resp3.size() >= 9) {
+        quint8 status3 = static_cast<quint8>(resp3[6]);
         CHECK(status3 == 0x00, "simulator writeRegister always succeeds → status 0x00");
-    }
-
-    TEST("read invalid register 0x08:0x00 returns error");
-    QByteArray rf = buildReadRegisterFrame(DEV_ADDR, 0x08, 0x00);
-    QByteArray rresp = core.handleFrame(rf);
-    CHECK(!rresp.isEmpty(), "read invalid register should return error frame");
-    if (rresp.size() >= 5) {
-        quint8 errCode = static_cast<quint8>(rresp[4]);
-        CHECK(errCode == 0x03, "error code should be ERROR_INVALID_DATA (0x03)");
     }
 
     TEST("write with maximum value 0xFFFFFFFF");
     QByteArray wf4 = buildWriteRegisterFrame(DEV_ADDR, 0x02, 0x00, 0xFFFFFFFF);
     QByteArray resp4 = core.handleFrame(wf4);
     CHECK(!resp4.isEmpty(), "write max value should succeed");
-    if (resp4.size() >= 6) {
-        CHECK(static_cast<quint8>(resp4[5]) == 0x00, "status should be 0x00");
+    if (resp4.size() >= 9) {
+        CHECK(static_cast<quint8>(resp4[6]) == 0x00, "status should be 0x00");
     }
 
     core.reset();
@@ -970,7 +992,7 @@ static void testStateMachineEdgeCases()
 
     TEST("edge: start() from Idle → Starting");
     core.stateMachine()->start();
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Starting,
           "start from Idle should transition to Starting");
 
@@ -979,7 +1001,7 @@ static void testStateMachineEdgeCases()
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Starting,
           "start from Starting should be no-op");
 
-    QThread::msleep(2100);
+    processEventsFor(2100);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Running,
           "should transition to Running after delay");
 
@@ -990,11 +1012,11 @@ static void testStateMachineEdgeCases()
 
     TEST("edge: stop() from Running → Stopping");
     core.stateMachine()->stop();
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Stopping,
           "stop from Running should transition to Stopping");
 
-    QThread::msleep(1600);
+    processEventsFor(1600);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Idle,
           "should return to Idle after stopping");
 
@@ -1018,14 +1040,14 @@ static void testErrorStateAndRecovery()
     TEST("error: set current setpoint to force over-current");
     core.handleFrame(buildWriteRegisterFrame(DEV_ADDR, 0x02, 0x00, 30000));
     core.stateMachine()->start();
-    QThread::msleep(2100);
+    processEventsFor(2100);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Running,
           "should be Running after startup");
 
     TEST("error: set very low target to trigger over-current alarm");
     core.handleFrame(buildWriteRegisterFrame(DEV_ADDR, 0x02, 0x00, 100));
     core.handleFrame(buildWriteRegisterFrame(DEV_ADDR, 0x03, 0x00, 0));
-    QThread::msleep(3000);
+    processEventsFor(3000);
     SimDeviceStateMachine::DeviceState errState = core.stateMachine()->currentState();
     bool isErrorOrRunning = (errState == SimDeviceStateMachine::Error ||
                              errState == SimDeviceStateMachine::Running);
@@ -1039,7 +1061,7 @@ static void testErrorStateAndRecovery()
 
     TEST("error: after reset, start works normally again");
     core.stateMachine()->start();
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Starting,
           "should be Starting after reset+start");
 
@@ -1072,7 +1094,7 @@ static void testFullOperationalCycle()
 
     TEST("cycle: start device");
     core.stateMachine()->start();
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Starting,
           "should be Starting");
 
@@ -1081,11 +1103,11 @@ static void testFullOperationalCycle()
     for (int i = 0; i < 3; ++i) {
         QByteArray resp = core.handleFrame(buildReadStatusFrame(DEV_ADDR));
         if (!resp.isEmpty() && static_cast<quint8>(resp[0]) == FRAME_HEADER) validPolls++;
-        QThread::msleep(200);
+        processEventsFor(200);
     }
     CHECK(validPolls == 3, "all 3 polls during startup should succeed");
 
-    QThread::msleep(1700);
+    processEventsFor(1700);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Running,
           "should be Running after startup completes");
 
@@ -1094,7 +1116,7 @@ static void testFullOperationalCycle()
     for (int i = 0; i < 5; ++i) {
         QByteArray resp = core.handleFrame(buildReadStatusFrame(DEV_ADDR));
         if (!resp.isEmpty() && resp.size() >= 10) validPolls++;
-        QThread::msleep(200);
+        processEventsFor(200);
     }
     CHECK(validPolls == 5, "all 5 polls during running should succeed");
 
@@ -1108,11 +1130,11 @@ static void testFullOperationalCycle()
 
     TEST("cycle: stop device");
     core.stateMachine()->stop();
-    QThread::msleep(50);
+    processEventsFor(50);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Stopping,
           "should be Stopping");
 
-    QThread::msleep(1600);
+    processEventsFor(1600);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Idle,
           "should be Idle after stop completes");
 
@@ -1142,7 +1164,7 @@ static void testParameterTuningDuringSimulation()
     sm->setNoiseAmplitude(0.1);
     CHECK(sm->noiseAmplitude() == 0.1, "noise amplitude should be 0.1");
 
-    QThread::msleep(2200);
+    processEventsFor(2200);
     CHECK(sm->currentState() == SimDeviceStateMachine::Running,
           "should be Running after startup");
 
@@ -1154,7 +1176,7 @@ static void testParameterTuningDuringSimulation()
     sm->setNoiseAmplitude(0);
     CHECK(sm->noiseAmplitude() == 0.0, "noise should be 0");
 
-    QThread::msleep(300);
+    processEventsFor(300);
 
     TEST("tuning: increase noise to maximum while running");
     sm->setNoiseAmplitude(0.15);
@@ -1199,7 +1221,7 @@ static void testParameterTuningDuringSimulation()
     CHECK(sm->tempResponseLag() == 0.5, "should clamp to max 0.5");
 
     sm->stop();
-    QThread::msleep(1600);
+    processEventsFor(1600);
     core.stopSimulation();
 }
 
@@ -1274,19 +1296,21 @@ static void testFaultInjectionCombinedScenarios()
     fi->setCorruptRate(0.5);
     fi->setWrongChecksum(true);
 
-    int corruptions = 0;
-    for (int i = 0; i < 30; ++i) {
-        QByteArray orig = buildReadStatusFrame(DEV_ADDR);
-        QByteArray resp = core.handleFrame(orig);
-        if (!resp.isEmpty() && resp.size() == orig.size()) {
-            int diffs = 0;
-            for (int j = 0; j < resp.size(); ++j) {
-                if (resp[j] != orig[j]) diffs++;
-            }
-            if (diffs >= 1) corruptions++;
+    fi->setEnabled(false);
+    QByteArray refResp = core.handleFrame(buildReadRegisterFrame(DEV_ADDR, 0x07, 0x00));
+    fi->setEnabled(true);
+
+    int altered = 0;
+    for (int i = 0; i < 40; ++i) {
+        QByteArray resp = core.handleFrame(buildReadRegisterFrame(DEV_ADDR, 0x07, 0x00));
+        int diffs = 0;
+        int minLen = std::min(refResp.size(), resp.size());
+        for (int j = 0; j < minLen; ++j) {
+            if (resp[j] != refResp[j]) diffs++;
         }
+        if (diffs > 0 || resp.size() != refResp.size()) altered++;
     }
-    CHECK(corruptions >= 10, "corruptRate 0.5 + checksum=true should produce many altered frames");
+    CHECK(altered >= 10, "corruptRate 0.5 + checksum=true should produce many altered frames");
 
     fi->setEnabled(false);
     fi->setWrongChecksum(false);
@@ -1314,7 +1338,7 @@ static void testSimulatorCoreReset()
     TEST("reset: start simulation, modify registers, reset");
     core.startSimulation();
     core.stateMachine()->start();
-    QThread::msleep(100);
+    processEventsFor(100);
     core.writeRawRegister(0x02, 0x00, 99999);
     core.writeRawRegister(0x07, 0x06, 888);
 
@@ -1328,14 +1352,14 @@ static void testSimulatorCoreReset()
     TEST("reset: multiple resets in sequence");
     core.startSimulation();
     core.stateMachine()->start();
-    QThread::msleep(100);
+    processEventsFor(100);
     for (int i = 0; i < 5; ++i) {
         core.reset();
         CHECK(core.readRawRegister(0x00, 0x00) == 0x00000001,
               "status should be Idle(0x01) after each reset");
         core.startSimulation();
         core.stateMachine()->start();
-        QThread::msleep(50);
+        processEventsFor(50);
     }
     core.reset();
     core.stopSimulation();
@@ -1349,7 +1373,7 @@ static void testThroughputStress()
     core.initialize();
     core.startSimulation();
     core.stateMachine()->start();
-    QThread::msleep(2100);
+    processEventsFor(2100);
 
     TEST("throughput: 500 read-status frames in rapid succession");
     int ok = 0;
@@ -1379,7 +1403,7 @@ static void testThroughputStress()
         case 1: req = buildReadRegisterFrame(DEV_ADDR, 0x07, static_cast<quint8>(i % 9)); break;
         case 2: req = buildReadRegisterFrame(DEV_ADDR, 0x02, 0x00); break;
         case 3: req = buildWriteRegisterFrame(DEV_ADDR, 0x02, 0x00, static_cast<quint32>(i * 10)); break;
-        case 4: req = buildControlFrame(DEV_ADDR, 0x03); break;
+        case 4: req = buildControlFrame(DEV_ADDR, 0x01); break;
         }
         QByteArray resp = core.handleFrame(req);
         if (!resp.isEmpty() && static_cast<quint8>(resp[0]) == FRAME_HEADER) mixedOk++;
@@ -1396,7 +1420,7 @@ static void testThroughputStress()
     CHECK(core.powerReading() >= 0, "power reading should be >= 0 after stress");
 
     core.stateMachine()->stop();
-    QThread::msleep(100);
+    processEventsFor(100);
     core.stateMachine()->reset();
     core.stopSimulation();
 }
@@ -1426,14 +1450,14 @@ static void testMixedCommandWorkload()
     core.handleFrame(buildWriteRegisterFrame(DEV_ADDR, 0x03, 0x00, 30000));
     core.handleFrame(buildWriteRegisterFrame(DEV_ADDR, 0x05, 0x00, 0x0000003F));
     core.stateMachine()->start();
-    QThread::msleep(100);
+    processEventsFor(100);
 
     TEST("mixed: periodic status polling pattern (10 polls, 200ms interval)");
     int pollOk = 0;
     for (int i = 0; i < 10; ++i) {
         QByteArray resp = core.handleFrame(buildReadStatusFrame(DEV_ADDR));
         if (!resp.isEmpty() && resp.size() >= 18) pollOk++;
-        QThread::msleep(200);
+        processEventsFor(200);
     }
     CHECK(pollOk >= 8, "at least 8 of 10 periodic polls should succeed");
 
@@ -1447,7 +1471,7 @@ static void testMixedCommandWorkload()
                (static_cast<quint8>(r[8]) << 8) | static_cast<quint8>(r[9]))
             : 0;
         CHECK(readVal == setpoints[i], "setpoint write-then-read should be consistent");
-        QThread::msleep(300);
+        processEventsFor(300);
     }
 
     TEST("mixed: read all registers in one sweep");
@@ -1478,7 +1502,7 @@ static void testMixedCommandWorkload()
 
     TEST("mixed: stop and verify clean state");
     core.stateMachine()->stop();
-    QThread::msleep(1600);
+    processEventsFor(1600);
     CHECK(core.stateMachine()->currentState() == SimDeviceStateMachine::Idle,
           "should return to Idle after stop");
     CHECK(core.statusValue() == 0x00000001, "status should be Idle(0x01)");
