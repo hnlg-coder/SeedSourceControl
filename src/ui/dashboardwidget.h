@@ -11,10 +11,14 @@
 #include <QProgressBar>
 #include "../model/devicedatamodel.h"
 
+class LogPanel;
+
 class DashboardWidget : public QWidget {
     Q_OBJECT
 public:
     explicit DashboardWidget(QWidget* parent = nullptr);
+
+void setLogPanel(LogPanel* panel);
 
 public slots:
     void updateData(const DeviceDataModel::RealTimeData& data);
@@ -44,6 +48,9 @@ private:
     // 快捷控制
     QPushButton* m_startButton;
     QPushButton* m_stopButton;
+
+    // 日志面板
+    LogPanel* m_logPanel;
 };
 
 #endif // DASHBOARDWIDGET_H

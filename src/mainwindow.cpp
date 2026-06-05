@@ -121,11 +121,10 @@ void MainWindow::setupUI()
 
     mainLayout->addWidget(m_tabWidget, 1);
 
-    // === 底部：日志面板 ===
+    // 日志面板：创建后添加到总览页签
     m_logPanel = new LogPanel();
-    m_logPanel->setMinimumHeight(80);
-    m_logPanel->setMaximumHeight(200);
-    mainLayout->addWidget(m_logPanel);
+    m_logPanel->setMinimumHeight(120);
+    m_dashboardWidget->setLogPanel(m_logPanel);
 
     // 状态栏
     statusBar()->showMessage(tr("就绪"));

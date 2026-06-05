@@ -1,10 +1,21 @@
 #include "dashboardwidget.h"
+#include "logpanel.h"
 #include <QFormLayout>
 
 DashboardWidget::DashboardWidget(QWidget* parent)
     : QWidget(parent)
+    , m_logPanel(nullptr)
 {
     setupUI();
+}
+
+void DashboardWidget::setLogPanel(LogPanel* panel)
+{
+    m_logPanel = panel;
+    QVBoxLayout* layout = qobject_cast<QVBoxLayout*>(this->layout());
+    if (layout) {
+        layout->addWidget(panel);
+    }
 }
 
 void DashboardWidget::updateData(const DeviceDataModel::RealTimeData& data)
@@ -139,8 +150,6 @@ void DashboardWidget::setupUI()
 
     controlGroup->setLayout(controlLayout);
     mainLayout->addWidget(controlGroup);
-
-    mainLayout->addStretch();
 
     connect(m_startButton, &QPushButton::clicked, this, &DashboardWidget::startClicked);
     connect(m_stopButton, &QPushButton::clicked, this, &DashboardWidget::stopClicked);
