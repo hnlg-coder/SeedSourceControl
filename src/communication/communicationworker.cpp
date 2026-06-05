@@ -9,7 +9,6 @@ CommunicationWorker::CommunicationWorker(QObject* parent)
     , m_connected(false)
     , m_state(Idle)
     , m_pollTimer(nullptr)
-    , m_connectionCheckTimer(nullptr)
     , m_threadFinished(false)
     , m_protocolParser(nullptr)
     , m_handshakeTimer(nullptr)
@@ -71,12 +70,10 @@ void CommunicationWorker::run()
 
     // 在子线程中创建定时器
     m_pollTimer = new QTimer();
-    m_connectionCheckTimer = new QTimer();
     m_handshakeTimer = new QTimer();
 
     // 连接信号槽（在子线程中）
     connect(m_pollTimer, &QTimer::timeout, this, &CommunicationWorker::processCommandQueue);
-    connect(m_connectionCheckTimer, &QTimer::timeout, this, &CommunicationWorker::checkConnection);
     connect(m_handshakeTimer, &QTimer::timeout, this, &CommunicationWorker::onHandshakeTimeout);
 
     // 连接主线程的请求信号到子线程的执行槽
@@ -86,7 +83,6 @@ void CommunicationWorker::run()
 
     m_threadFinished = false;
     m_pollTimer->start(10);
-    m_connectionCheckTimer->start(5000);
 
     // 进入事件循环
     exec();
@@ -103,13 +99,10 @@ void CommunicationWorker::run()
 
     // 清理定时器
     m_pollTimer->stop();
-    m_connectionCheckTimer->stop();
     m_handshakeTimer->stop();
     delete m_pollTimer;
-    delete m_connectionCheckTimer;
     delete m_handshakeTimer;
     m_pollTimer = nullptr;
-    m_connectionCheckTimer = nullptr;
     m_handshakeTimer = nullptr;
 
     {
@@ -489,20 +482,3 @@ void CommunicationWorker::onCommandCompleted(bool success, const QVariant& resul
     }
 }
 
-void CommunicationWorker::checkConnection()
-{
-    if (m_serialPort) {
-        bool wasConnected;
-        bool newConnected;
-        {
-            QMutexLocker locker(&m_stateMutex);
-            wasConnected = m_connected;
-            m_connected = m_serialPort->isOpen();
-            newConnected = m_connected;
-        }
-
-        if (wasConnected != newConnected) {
-            emit connectionStateChanged(newConnected);
-        }
-    }
-}

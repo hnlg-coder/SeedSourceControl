@@ -158,11 +158,6 @@ private slots:
     void sendNextRequest(const QByteArray& request);
 
     /**
-     * @brief 检查连接状态（在子线程中执行）
-     */
-    void checkConnection();
-
-    /**
      * @brief 在子线程中执行连接操作
      */
     void doConnectDevice();
@@ -215,7 +210,6 @@ private:
     bool m_connected;          // 是否连接
     CommunicationState m_state;  // 通信状态
     QTimer* m_pollTimer;      // 轮询定时器
-    QTimer* m_connectionCheckTimer; // 连接检查定时器
     bool m_threadFinished;    // 线程是否已完成
 
     IProtocolParser* m_protocolParser;  // 协议解析器
