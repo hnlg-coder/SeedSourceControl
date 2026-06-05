@@ -31,6 +31,10 @@ set(SOURCES
     
     src/visualization/realtimeplotwidget.h
     src/visualization/realtimeplotwidget.cpp
+    src/visualization/enhancedchartwidget.h
+    src/visualization/enhancedchartwidget.cpp
+    src/visualization/statisticscalculator.h
+    src/visualization/statisticscalculator.cpp
     
     src/ui/connectionpanel.h
     src/ui/connectionpanel.cpp
@@ -46,6 +50,18 @@ set(SOURCES
     src/ui/datatablepanel.cpp
     src/ui/logpanel.h
     src/ui/logpanel.cpp
+    src/ui/dashboardwidget.h
+    src/ui/dashboardwidget.cpp
+    src/ui/configwidget.h
+    src/ui/configwidget.cpp
+    src/ui/monitorwidget.h
+    src/ui/monitorwidget.cpp
+    src/ui/currentcontrolwidget.h
+    src/ui/currentcontrolwidget.cpp
+    src/ui/temperaturecontrolwidget.h
+    src/ui/temperaturecontrolwidget.cpp
+    src/ui/alertwidget.h
+    src/ui/alertwidget.cpp
     
     src/database/databasemanager.h
     src/database/databasemanager.cpp
@@ -69,6 +85,8 @@ set(HEADERS
     src/model/devicedatamodel.h
     
     src/visualization/realtimeplotwidget.h
+    src/visualization/enhancedchartwidget.h
+    src/visualization/statisticscalculator.h
     
     src/ui/connectionpanel.h
     src/ui/statuspanel.h
@@ -77,6 +95,12 @@ set(HEADERS
     src/ui/alarmpanel.h
     src/ui/datatablepanel.h
     src/ui/logpanel.h
+    src/ui/dashboardwidget.h
+    src/ui/configwidget.h
+    src/ui/monitorwidget.h
+    src/ui/currentcontrolwidget.h
+    src/ui/temperaturecontrolwidget.h
+    src/ui/alertwidget.h
     
     src/database/databasemanager.h
     

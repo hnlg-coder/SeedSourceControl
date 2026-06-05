@@ -47,8 +47,8 @@ void ConnectionPanel::setConnected(bool connected)
     
     if (connected) {
         m_connectButton->setText("Disconnect");
-        m_statusLabel->setText("Status: Connected");
-        m_statusLabel->setStyleSheet("color: green; font-weight: bold;");
+        m_statusLabel->setText("Connected");
+        m_statusLabel->setStyleSheet("color: green; font-weight: bold; font-size: 11px;");
         m_portCombo->setEnabled(false);
         m_baudRateCombo->setEnabled(false);
         m_dataBitsCombo->setEnabled(false);
@@ -57,8 +57,8 @@ void ConnectionPanel::setConnected(bool connected)
         m_flowControlCombo->setEnabled(false);
     } else {
         m_connectButton->setText("Connect");
-        m_statusLabel->setText("Status: Disconnected");
-        m_statusLabel->setStyleSheet("color: red; font-weight: bold;");
+        m_statusLabel->setText("Disconnected");
+        m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px;");
         m_portCombo->setEnabled(true);
         m_baudRateCombo->setEnabled(true);
         m_dataBitsCombo->setEnabled(true);
@@ -88,49 +88,83 @@ void ConnectionPanel::onConnectButtonClicked()
 
 void ConnectionPanel::setupUI()
 {
-    QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    
-    QGroupBox* groupBox = new QGroupBox("Serial Port Configuration");
-    QFormLayout* formLayout = new QFormLayout();
-    
+    QHBoxLayout* mainLayout = new QHBoxLayout(this);
+    mainLayout->setContentsMargins(4, 2, 4, 2);
+    mainLayout->setSpacing(4);
+
+    QString comboStyle =
+        "QComboBox {"
+        "  border: 1px solid #ccc;"
+        "  border-radius: 2px;"
+        "  padding: 1px 4px;"
+        "  background: white;"
+        "  min-height: 18px;"
+        "  font-size: 11px;"
+        "}"
+        "QComboBox::drop-down {"
+        "  width: 0px;"
+        "  border: none;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  image: none;"
+        "}";
+
     m_portCombo = new QComboBox();
     m_baudRateCombo = new QComboBox();
     m_dataBitsCombo = new QComboBox();
     m_parityCombo = new QComboBox();
     m_stopBitsCombo = new QComboBox();
     m_flowControlCombo = new QComboBox();
-    
+
+    m_portCombo->setStyleSheet(comboStyle);
+    m_baudRateCombo->setStyleSheet(comboStyle);
+    m_dataBitsCombo->setStyleSheet(comboStyle);
+    m_parityCombo->setStyleSheet(comboStyle);
+    m_stopBitsCombo->setStyleSheet(comboStyle);
+    m_flowControlCombo->setStyleSheet(comboStyle);
+
     populateBaudRates();
     populateDataBits();
     populateParity();
     populateStopBits();
     populateFlowControl();
-    
-    formLayout->addRow("Port:", m_portCombo);
-    formLayout->addRow("Baud Rate:", m_baudRateCombo);
-    formLayout->addRow("Data Bits:", m_dataBitsCombo);
-    formLayout->addRow("Parity:", m_parityCombo);
-    formLayout->addRow("Stop Bits:", m_stopBitsCombo);
-    formLayout->addRow("Flow Control:", m_flowControlCombo);
-    
-    QHBoxLayout* buttonLayout = new QHBoxLayout();
+
+    m_portCombo->setMinimumWidth(80);
+    m_baudRateCombo->setMinimumWidth(80);
+    m_dataBitsCombo->setMinimumWidth(50);
+    m_parityCombo->setMinimumWidth(60);
+    m_stopBitsCombo->setMinimumWidth(50);
+    m_flowControlCombo->setMinimumWidth(70);
+
+    mainLayout->addWidget(new QLabel("Port:"));
+    mainLayout->addWidget(m_portCombo);
+    mainLayout->addWidget(new QLabel("Baud:"));
+    mainLayout->addWidget(m_baudRateCombo);
+    mainLayout->addWidget(new QLabel("Data:"));
+    mainLayout->addWidget(m_dataBitsCombo);
+    mainLayout->addWidget(new QLabel("Parity:"));
+    mainLayout->addWidget(m_parityCombo);
+    mainLayout->addWidget(new QLabel("Stop:"));
+    mainLayout->addWidget(m_stopBitsCombo);
+    mainLayout->addWidget(new QLabel("Flow:"));
+    mainLayout->addWidget(m_flowControlCombo);
+
+    mainLayout->addSpacing(8);
+
     m_connectButton = new QPushButton("Connect");
     m_refreshButton = new QPushButton("Refresh");
-    
-    buttonLayout->addWidget(m_refreshButton);
-    buttonLayout->addWidget(m_connectButton);
-    buttonLayout->addStretch();
-    
-    m_statusLabel = new QLabel("Status: Disconnected");
-    m_statusLabel->setStyleSheet("color: red; font-weight: bold;");
-    
-    formLayout->addRow(m_statusLabel);
-    formLayout->addRow(buttonLayout);
-    
-    groupBox->setLayout(formLayout);
-    mainLayout->addWidget(groupBox);
+    m_connectButton->setFixedHeight(24);
+    m_refreshButton->setFixedHeight(24);
+
+    mainLayout->addWidget(m_refreshButton);
+    mainLayout->addWidget(m_connectButton);
+
+    m_statusLabel = new QLabel("Disconnected");
+    m_statusLabel->setStyleSheet("color: red; font-weight: bold; font-size: 11px;");
+
+    mainLayout->addWidget(m_statusLabel);
     mainLayout->addStretch();
-    
+
     connect(m_refreshButton, &QPushButton::clicked, this, &ConnectionPanel::refreshPorts);
     connect(m_connectButton, &QPushButton::clicked, this, &ConnectionPanel::onConnectButtonClicked);
 }

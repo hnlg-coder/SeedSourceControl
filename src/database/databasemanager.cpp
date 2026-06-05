@@ -108,8 +108,8 @@ bool DatabaseManager::saveData(const DeviceDataModel::RealTimeData& data)
     query.addBindValue(data.current);
     query.addBindValue(data.temperature);
     query.addBindValue(data.power);
-    query.addBindValue(data.status);
-    query.addBindValue(data.alarm);
+    query.addBindValue(data.statusRaw);
+    query.addBindValue(data.alarmRaw);
     
     if (!query.exec()) {
         qCritical() << "Failed to save data:" << query.lastError().text();
@@ -141,8 +141,10 @@ QVector<DeviceDataModel::RealTimeData> DatabaseManager::loadData(const QDateTime
             data.current = query.value(1).toDouble();
             data.temperature = query.value(2).toDouble();
             data.power = query.value(3).toDouble();
-            data.status = query.value(4).toUInt();
-            data.alarm = query.value(5).toUInt();
+            data.status = DeviceDataModel::StatusBits::fromRaw(query.value(4).toUInt());
+            data.statusRaw = query.value(4).toUInt();
+            data.alert = DeviceDataModel::AlertBits::fromRaw(query.value(5).toUInt());
+            data.alarmRaw = query.value(5).toUInt();
             result.append(data);
         }
     } else {

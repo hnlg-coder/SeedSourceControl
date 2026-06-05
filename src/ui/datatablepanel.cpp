@@ -85,8 +85,8 @@ void DataTablePanel::addDataRow(const DeviceDataModel::RealTimeData& data)
     m_dataTable->setItem(row, 1, new QTableWidgetItem(QString::number(data.current, 'f', 2)));
     m_dataTable->setItem(row, 2, new QTableWidgetItem(QString::number(data.temperature, 'f', 2)));
     m_dataTable->setItem(row, 3, new QTableWidgetItem(QString::number(data.power, 'f', 2)));
-    m_dataTable->setItem(row, 4, new QTableWidgetItem(QString::number(data.status)));
-    m_dataTable->setItem(row, 5, new QTableWidgetItem(QString::number(data.alarm)));
+    m_dataTable->setItem(row, 4, new QTableWidgetItem(QString::number(data.statusRaw)));
+    m_dataTable->setItem(row, 5, new QTableWidgetItem(QString::number(data.alarmRaw)));
     
     // 滚动到底部
     m_dataTable->scrollToBottom();

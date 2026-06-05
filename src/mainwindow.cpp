@@ -1,405 +1,374 @@
 #include "mainwindow.h"
 #include "ui/connectionpanel.h"
-#include "ui/statuspanel.h"
-#include "ui/controlpanel.h"
-#include "ui/realtimeplotpanel.h"
-#include "ui/alarmpanel.h"
 #include "ui/logpanel.h"
+#include "ui/dashboardwidget.h"
+#include "ui/currentcontrolwidget.h"
+#include "ui/temperaturecontrolwidget.h"
+#include "ui/monitorwidget.h"
+#include "ui/configwidget.h"
+#include "ui/alertwidget.h"
+#include "ui/datatablepanel.h"
 #include "protocol/protocolparser.h"
 #include "communication/communicationworker.h"
 #include "model/devicedatamodel.h"
 #include "communication/command.h"
-#include <QSplitter>
 #include <QMenuBar>
 #include <QToolBar>
 #include <QStatusBar>
 #include <QMessageBox>
 #include <QDebug>
+#include <QLabel>
+#include <QDateTime>
 #include "config/configmanager.h"
 #include "database/databasemanager.h"
 #include "alarm/alarmmanager.h"
 
-/**
- * @brief 主窗口构造函数
- * @param parent 父窗口指针
- */
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
+    , m_tabWidget(nullptr)
+    , m_dashboardWidget(nullptr)
+    , m_currentControlWidget(nullptr)
+    , m_temperatureControlWidget(nullptr)
+    , m_monitorWidget(nullptr)
+    , m_configWidget(nullptr)
+    , m_alertWidget(nullptr)
+    , m_statisticsTab(nullptr)
+    , m_dataTablePanel(nullptr)
     , m_connected(false)
     , m_running(false)
 {
-    // 初始化用户界面
     setupUI();
-    
-    // 创建菜单栏
     createMenus();
-    
-    // 创建工具栏
     createToolbar();
-    
-    // 初始化组件
     initializeComponents();
-    
-    // 连接信号槽
     connectSignals();
-    
-    // 设置窗口标题和大小
-    setWindowTitle(tr("种子源模块控制器 - v1.0"));
-    resize(1200, 800);
+
+    setWindowTitle(tr("种子源模块控制器 - v2.0"));
+    resize(1280, 900);
 }
 
-/**
- * @brief 主窗口析构函数
- */
 MainWindow::~MainWindow()
 {
-    // 先停止定时器
-    if (m_pollTimer) {
-        m_pollTimer->stop();
-    }
-    
-    // 停止运行
     m_running = false;
     m_connected = false;
-    
-    // 停止通信工作线程（由CommunicationWorker自己处理线程退出和串口关闭）
+
+    if (m_pollTimer) {
+        m_pollTimer->stop();
+        delete m_pollTimer;
+        m_pollTimer = nullptr;
+    }
+
     if (m_communicationWorker) {
         m_communicationWorker->stopCommunication();
+        disconnect(m_communicationWorker, nullptr, this, nullptr);
+        m_communicationWorker->deleteLater();
+        m_communicationWorker = nullptr;
     }
-    
-    // 关闭数据库
+
     DatabaseManager::instance()->close();
 }
 
-/**
- * @brief 设置用户界面布局
- */
 void MainWindow::setupUI()
 {
-    // 创建主部件
     QWidget* centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
-    
-    // 创建水平分割器
-    QSplitter* mainSplitter = new QSplitter(Qt::Horizontal, centralWidget);
-    
-    // 创建垂直分割器（左侧：连接和控制，右侧：绘图和日志）
-    QSplitter* leftSplitter = new QSplitter(Qt::Vertical, mainSplitter);
-    QSplitter* rightSplitter = new QSplitter(Qt::Vertical, mainSplitter);
-    
-    // 创建各个面板
-    m_connectionPanel = new ConnectionPanel(leftSplitter);
-    m_controlPanel = new ControlPanel(leftSplitter);
-    m_statusPanel = new StatusPanel(leftSplitter);
-    m_plotPanel = new RealtimePlotPanel(rightSplitter);
-    m_alarmPanel = new AlarmPanel(rightSplitter);
-    m_logPanel = new LogPanel(rightSplitter);
-    
-    // 添加到分割器
-    leftSplitter->addWidget(m_connectionPanel);
-    leftSplitter->addWidget(m_controlPanel);
-    leftSplitter->addWidget(m_statusPanel);
-    
-    rightSplitter->addWidget(m_plotPanel);
-    rightSplitter->addWidget(m_alarmPanel);
-    rightSplitter->addWidget(m_logPanel);
-    
-    // 设置分割器比例
-    leftSplitter->setSizes({300, 300, 200});
-    rightSplitter->setSizes({400, 200, 200});
-    mainSplitter->setSizes({300, 700});
-    
-    // 设置主布局
+
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->addWidget(mainSplitter);
-    
-    // 创建状态栏
+    mainLayout->setContentsMargins(4, 4, 4, 4);
+    mainLayout->setSpacing(2);
+
+    // === 顶部：串口连接面板 ===
+    m_connectionPanel = new ConnectionPanel();
+    mainLayout->addWidget(m_connectionPanel);
+
+    // === 中间：QTabWidget 功能页签 ===
+    m_tabWidget = new QTabWidget();
+
+    // 页签1: 总览
+    m_dashboardWidget = new DashboardWidget();
+    m_tabWidget->addTab(m_dashboardWidget, tr("总览"));
+
+    // 页签2: 电流控制
+    m_currentControlWidget = new CurrentControlWidget();
+    m_tabWidget->addTab(m_currentControlWidget, tr("电流控制"));
+
+    // 页签3: 温度控制
+    m_temperatureControlWidget = new TemperatureControlWidget();
+    m_tabWidget->addTab(m_temperatureControlWidget, tr("温度控制"));
+
+    // 页签4: 功率监测
+    m_monitorWidget = new MonitorWidget();
+    m_tabWidget->addTab(m_monitorWidget, tr("功率监测"));
+
+    // 页签5: 设备配置
+    m_configWidget = new ConfigWidget();
+    m_tabWidget->addTab(m_configWidget, tr("设备配置"));
+
+    // 页签6: 报警管理
+    m_alertWidget = new AlertWidget();
+    m_tabWidget->addTab(m_alertWidget, tr("报警管理"));
+
+    // 页签7: 数据统计（DataTablePanel + 统计信息）
+    m_statisticsTab = new QWidget();
+    QVBoxLayout* statLayout = new QVBoxLayout(m_statisticsTab);
+    QLabel* statHeaderLabel = new QLabel(tr("数据统计 - 历史数据记录与导出"));
+    statHeaderLabel->setStyleSheet("font-weight: bold; font-size: 13px; padding: 4px;");
+    statLayout->addWidget(statHeaderLabel);
+    m_dataTablePanel = new DataTablePanel();
+    statLayout->addWidget(m_dataTablePanel);
+    m_tabWidget->addTab(m_statisticsTab, tr("数据统计"));
+
+    mainLayout->addWidget(m_tabWidget, 1);
+
+    // === 底部：日志面板 ===
+    m_logPanel = new LogPanel();
+    m_logPanel->setMaximumHeight(150);
+    mainLayout->addWidget(m_logPanel);
+
+    // 状态栏
     statusBar()->showMessage(tr("就绪"));
 }
 
-/**
- * @brief 创建菜单栏
- */
 void MainWindow::createMenus()
 {
-    // 文件菜单
     QMenu* fileMenu = menuBar()->addMenu(tr("文件(&F)"));
-    
+
     QAction* exitAction = new QAction(tr("退出(&X)"), this);
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, &QMainWindow::close);
     fileMenu->addAction(exitAction);
-    
-    // 视图菜单
+
     QMenu* viewMenu = menuBar()->addMenu(tr("视图(&V)"));
-    
-    // 工具菜单
+
     QMenu* toolMenu = menuBar()->addMenu(tr("工具(&T)"));
-    
-    // 帮助菜单
+
     QMenu* helpMenu = menuBar()->addMenu(tr("帮助(&H)"));
-    
+
     QAction* aboutAction = new QAction(tr("关于(&A)"), this);
     connect(aboutAction, &QAction::triggered, [this]() {
-        QMessageBox::about(this, tr("关于"), tr("种子源模块控制器 v1.0\n基于Qt框架开发"));
+        QMessageBox::about(this, tr("关于"), tr("种子源模块控制器 v2.0\n基于Qt框架开发\n支持协议V1.3全寄存器数据展示"));
     });
     helpMenu->addAction(aboutAction);
 }
 
-/**
- * @brief 创建工具栏
- */
 void MainWindow::createToolbar()
 {
     QToolBar* toolBar = addToolBar(tr("主工具栏"));
-    
+
     QAction* connectAction = new QAction(tr("连接"), this);
     QAction* disconnectAction = new QAction(tr("断开"), this);
     QAction* startAction = new QAction(tr("启动"), this);
     QAction* stopAction = new QAction(tr("停止"), this);
-    
+
     toolBar->addAction(connectAction);
     toolBar->addAction(disconnectAction);
     toolBar->addSeparator();
     toolBar->addAction(startAction);
     toolBar->addAction(stopAction);
-    
-    // 连接信号
+
     connect(connectAction, &QAction::triggered, this, &MainWindow::onConnectClicked);
     connect(disconnectAction, &QAction::triggered, this, &MainWindow::onDisconnectClicked);
     connect(startAction, &QAction::triggered, this, &MainWindow::onStartClicked);
     connect(stopAction, &QAction::triggered, this, &MainWindow::onStopClicked);
 }
 
-/**
- * @brief 初始化各个组件
- */
 void MainWindow::initializeComponents()
 {
-    // 初始化配置管理器
     ConfigManager::instance();
-    
-    // 初始化数据库
     DatabaseManager::instance()->initialize(ConfigManager::instance()->databasePath());
-    
-    // 初始化报警管理器
     AlarmManager::instance();
-    
-    // 创建协议解析器
+
     m_protocolParser = new SeedSourceProtocolParser(this);
-    
-    // 创建数据模型
     m_dataModel = new DeviceDataModel(this);
-    
-    // 创建通信工作线程（QSerialPort在子线程中创建和管理）
     m_communicationWorker = new CommunicationWorker(this);
-    
-    // 创建轮询定时器
+
     m_pollTimer = new QTimer(this);
-    m_pollTimer->setInterval(100); // 默认100ms
-    
-    // 刷新串口列表
+    m_pollTimer->setInterval(200);
+
     m_connectionPanel->refreshPorts();
 }
 
-/**
- * @brief 连接信号槽
- */
 void MainWindow::connectSignals()
 {
     // 连接面板信号
     connect(m_connectionPanel, &ConnectionPanel::connectClicked, this, &MainWindow::onConnectClicked);
     connect(m_connectionPanel, &ConnectionPanel::disconnectClicked, this, &MainWindow::onDisconnectClicked);
-    
-    // 控制面板信号
-    connect(m_controlPanel, &ControlPanel::startClicked, this, &MainWindow::onStartClicked);
-    connect(m_controlPanel, &ControlPanel::stopClicked, this, &MainWindow::onStopClicked);
-    connect(m_controlPanel, &ControlPanel::resetClicked, this, &MainWindow::onResetClicked);
-    connect(m_controlPanel, &ControlPanel::calibrateClicked, this, &MainWindow::onCalibrateClicked);
-    connect(m_controlPanel, &ControlPanel::currentChanged, this, &MainWindow::onCurrentChanged);
-    connect(m_controlPanel, &ControlPanel::temperatureChanged, this, &MainWindow::onTemperatureChanged);
-    connect(m_controlPanel, &ControlPanel::powerChanged, this, &MainWindow::onPowerChanged);
-    
+
+    // 总览页签 - 启停控制
+    connect(m_dashboardWidget, &DashboardWidget::startClicked, this, &MainWindow::onStartClicked);
+    connect(m_dashboardWidget, &DashboardWidget::stopClicked, this, &MainWindow::onStopClicked);
+
+    // 电流控制 - 设定值变更
+    connect(m_currentControlWidget, &CurrentControlWidget::currentSetChanged,
+            this, &MainWindow::onCurrentSetChanged);
+
+    // 温度控制 - 设定值变更
+    connect(m_temperatureControlWidget, &TemperatureControlWidget::temperatureSetChanged,
+            this, &MainWindow::onTemperatureSetChanged);
+
+    // 设备配置 - 配置变更
+    connect(m_configWidget, &ConfigWidget::configChanged, this, &MainWindow::onConfigChanged);
+
     // 通信工作线程信号
-    connect(m_communicationWorker, &CommunicationWorker::connectionStateChanged, this, &MainWindow::onConnectionStateChanged);
-    connect(m_communicationWorker, &CommunicationWorker::logMessage, this, &MainWindow::onLogMessage);
-    
+    connect(m_communicationWorker, &CommunicationWorker::connectionStateChanged,
+            this, &MainWindow::onConnectionStateChanged);
+    connect(m_communicationWorker, &CommunicationWorker::logMessage,
+            this, &MainWindow::onLogMessage);
+
     // 命令完成信号 -> 更新数据模型
-    connect(m_communicationWorker, &CommunicationWorker::commandCompleted, this, [this](quint32 cmdId, bool success, QVariant result) {
+    connect(m_communicationWorker, &CommunicationWorker::commandCompleted,
+            this, [this](quint32 cmdId, bool success, QVariant result) {
         if (success && result.isValid()) {
-            // 如果结果是QVariantMap（ReadStatusCommand的返回），更新数据模型
             if (result.userType() == QMetaType::type("QVariantMap")) {
                 QVariantMap statusMap = result.toMap();
                 double current = statusMap.value("current", 0).toDouble();
                 double temperature = statusMap.value("temperature", 0).toDouble();
                 double power = statusMap.value("power", 0).toDouble();
-                m_dataModel->updateData(current, temperature, power, 0, 0);
+                quint32 status = statusMap.value("status", 0).toUInt();
+                quint32 alarm = statusMap.value("alarm", 0).toUInt();
+                m_dataModel->updateData(current, temperature, power, status, alarm);
             }
         }
     });
-    
-    // 数据模型信号
-    connect(m_dataModel, &DeviceDataModel::dataUpdated, this, [this](const DeviceDataModel::RealTimeData&) {
-        onDataUpdated();
+
+    // 数据模型信号 -> UI更新
+    connect(m_dataModel, &DeviceDataModel::dataUpdated, this, [this](const DeviceDataModel::RealTimeData& data) {
+        // 分发给所有 Widget
+        m_dashboardWidget->updateData(data);
+        m_currentControlWidget->updateData(data);
+        m_temperatureControlWidget->updateData(data);
+        m_monitorWidget->updateData(data);
+        m_configWidget->updateData(data);
+        m_alertWidget->updateData(data);
+        m_dataTablePanel->addDataRow(data);
+
+        // 更新状态栏
+        QString statusMsg = data.status.idle
+            ? tr("状态: 空闲")
+            : tr("状态: 运行中 | 电流: %1 mA | 温度: %2 °C | 功率: %3 mW")
+                  .arg(data.curVal, 0, 'f', 2)
+                  .arg(data.tempVal, 0, 'f', 3)
+                  .arg(data.pwrLas, 0, 'f', 2);
+        statusBar()->showMessage(statusMsg);
     });
-    connect(m_dataModel, &DeviceDataModel::alarmTriggered, this, &MainWindow::onAlarmTriggered);
-    
+
+    connect(m_dataModel, &DeviceDataModel::alarmTriggered, this, [this](quint32 alarmCode, const QString& message) {
+        m_alertWidget->onAlarmTriggered(alarmCode, message);
+        m_logPanel->logMessage(tr("报警: %1").arg(message), LogPanel::Error);
+
+        // 切换到报警页签
+        int alertIdx = m_tabWidget->indexOf(m_alertWidget);
+        if (alertIdx >= 0) {
+            m_tabWidget->setCurrentIndex(alertIdx);
+        }
+    });
+
     // 定时器信号
     connect(m_pollTimer, &QTimer::timeout, this, &MainWindow::pollDevice);
 }
 
-/**
- * @brief 连接按钮点击事件处理
- */
 void MainWindow::onConnectClicked()
 {
-    // 获取串口配置
     QString portName = m_connectionPanel->selectedPort();
     qint32 baudRate = m_connectionPanel->selectedBaudRate();
     QSerialPort::DataBits dataBits = m_connectionPanel->selectedDataBits();
     QSerialPort::Parity parity = m_connectionPanel->selectedParity();
     QSerialPort::StopBits stopBits = m_connectionPanel->selectedStopBits();
     QSerialPort::FlowControl flowControl = m_connectionPanel->selectedFlowControl();
-    
-    // 设置串口配置参数（线程安全）
+
     m_communicationWorker->setSerialConfig(portName, baudRate, dataBits, parity, stopBits, flowControl);
-    
-    // 启动通信工作线程
     m_communicationWorker->startCommunication();
-    
-    // 连接设备（通过信号通知子线程）
     m_communicationWorker->connectDevice();
-    
+
     m_logPanel->logMessage(tr("尝试连接设备: %1, 波特率: %2").arg(portName).arg(baudRate), LogPanel::Info);
 }
 
-/**
- * @brief 断开按钮点击事件处理
- */
 void MainWindow::onDisconnectClicked()
 {
-    // 停止运行
     if (m_running) {
         onStopClicked();
     }
-    
-    // 断开设备
+
     m_communicationWorker->disconnectDevice();
-    
     m_logPanel->logMessage(tr("设备断开连接"), LogPanel::Info);
 }
 
-/**
- * @brief 启动按钮点击事件处理
- */
 void MainWindow::onStartClicked()
 {
     if (!m_connected) {
         QMessageBox::warning(this, tr("警告"), tr("请先连接设备！"));
         return;
     }
-    
+
     m_running = true;
     m_pollTimer->start();
-    
-    // 发送启动命令
+
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Start, m_protocolParser);
     m_communicationWorker->sendCommand(command);
-    
+
     m_logPanel->logMessage(tr("设备启动"), LogPanel::Info);
     statusBar()->showMessage(tr("运行中..."));
 }
 
-/**
- * @brief 停止按钮点击事件处理
- */
 void MainWindow::onStopClicked()
 {
     m_running = false;
     m_pollTimer->stop();
-    
-    // 发送停止命令
+
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Stop, m_protocolParser);
     m_communicationWorker->sendCommand(command);
-    
+
     m_logPanel->logMessage(tr("设备停止"), LogPanel::Info);
     statusBar()->showMessage(tr("已停止"));
 }
 
-/**
- * @brief 重置按钮点击事件处理
- */
 void MainWindow::onResetClicked()
 {
-    // 发送重置命令
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Reset, m_protocolParser);
     m_communicationWorker->sendCommand(command);
-    
+
     m_logPanel->logMessage(tr("设备重置"), LogPanel::Info);
 }
 
-/**
- * @brief 校准按钮点击事件处理
- */
 void MainWindow::onCalibrateClicked()
 {
-    // 发送校准命令
     auto command = CommandFactory::createControlDeviceCommand(ControlDeviceCommand::Calibrate, m_protocolParser);
     m_communicationWorker->sendCommand(command);
-    
+
     m_logPanel->logMessage(tr("设备校准"), LogPanel::Info);
 }
 
-/**
- * @brief 电流参数改变事件处理
- */
-void MainWindow::onCurrentChanged(double value)
+void MainWindow::onCurrentSetChanged(double value)
 {
     if (m_connected && m_running) {
-        // 发送写寄存器命令
-        auto command = CommandFactory::createWriteRegisterCommand(0x02, 0x00, static_cast<quint32>(value), m_protocolParser);
+        auto command = CommandFactory::createWriteRegisterCommand(0x02, 0x00, static_cast<quint32>(value * 100), m_protocolParser);
         m_communicationWorker->sendCommand(command);
-        
+
         m_logPanel->logMessage(tr("设置目标电流: %1 mA").arg(value), LogPanel::Info);
     }
 }
 
-/**
- * @brief 温度参数改变事件处理
- */
-void MainWindow::onTemperatureChanged(double value)
+void MainWindow::onTemperatureSetChanged(double value)
 {
     if (m_connected && m_running) {
-        // 发送写寄存器命令
-        auto command = CommandFactory::createWriteRegisterCommand(0x03, 0x00, static_cast<quint32>(value), m_protocolParser);
+        auto command = CommandFactory::createWriteRegisterCommand(0x03, 0x00, static_cast<quint32>(value * 1000), m_protocolParser);
         m_communicationWorker->sendCommand(command);
-        
+
         m_logPanel->logMessage(tr("设置目标温度: %1 °C").arg(value), LogPanel::Info);
     }
 }
 
-/**
- * @brief 功率参数改变事件处理
- */
-void MainWindow::onPowerChanged(double value)
+void MainWindow::onConfigChanged()
 {
-    if (m_connected && m_running) {
-        // 发送写寄存器命令
-        auto command = CommandFactory::createWriteRegisterCommand(0x04, 0x00, static_cast<quint32>(value), m_protocolParser);
-        m_communicationWorker->sendCommand(command);
-        
-        m_logPanel->logMessage(tr("设置目标功率: %1 mW").arg(value), LogPanel::Info);
-    }
+    m_logPanel->logMessage(tr("配置已变更，需要发送配置写入命令"), LogPanel::Warning);
+    // 配置写入命令将在后续实现
 }
 
-/**
- * @brief 连接状态改变事件处理
- */
 void MainWindow::onConnectionStateChanged(bool connected)
 {
     m_connected = connected;
     m_connectionPanel->setConnected(connected);
-    
+
     if (connected) {
         m_logPanel->logMessage(tr("设备已连接"), LogPanel::Info);
         statusBar()->showMessage(tr("已连接"));
@@ -411,64 +380,28 @@ void MainWindow::onConnectionStateChanged(bool connected)
     }
 }
 
-/**
- * @brief 日志消息事件处理
- */
 void MainWindow::onLogMessage(const QString& message)
 {
     m_logPanel->logMessage(message, LogPanel::Info);
 }
 
-/**
- * @brief 数据更新事件处理
- */
 void MainWindow::onDataUpdated()
 {
-    if (!m_dataModel) return;
-    
-    DeviceDataModel::RealTimeData data = m_dataModel->currentData();
-    
-    // 更新状态面板
-    m_statusPanel->updateStatus(data.status);
-    m_statusPanel->updateCurrent(data.current);
-    m_statusPanel->updateTemperature(data.temperature);
-    m_statusPanel->updatePower(data.power);
-    m_statusPanel->updateAlarm(data.alarm);
-    
-    // 更新绘图面板
-    m_plotPanel->updateCurrent(data.current);
-    m_plotPanel->updateTemperature(data.temperature);
-    m_plotPanel->updatePower(data.power);
-    
-    // 保存到数据库
-    DatabaseManager::instance()->saveData(data);
+    // 此方法已通过 lambda 连接处理，保留用于兼容
 }
 
-/**
- * @brief 报警触发事件处理
- */
 void MainWindow::onAlarmTriggered(quint32 alarmCode, const QString& message)
 {
-    // 添加到报警面板
-    m_alarmPanel->addAlarm(alarmCode, message);
-    
-    // 保存到数据库
-    DatabaseManager::instance()->saveAlarm(alarmCode, message);
-    
-    // 记录日志
-    m_logPanel->logMessage(tr("报警: %1").arg(message), LogPanel::Error);
+    // 此方法已通过 lambda 连接处理，保留用于兼容
 }
 
-/**
- * @brief 轮询设备状态
- */
 void MainWindow::pollDevice()
 {
     if (!m_connected) {
         return;
     }
-    
-    // 发送读状态命令
+
+    // 发送读状态命令获取所有寄存器数据
     auto command = CommandFactory::createReadStatusCommand(m_protocolParser);
     m_communicationWorker->sendCommand(command);
 }
