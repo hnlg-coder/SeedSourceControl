@@ -11,6 +11,10 @@ CommunicationWorker::CommunicationWorker(QObject* parent)
     , m_pollTimer(nullptr)
     , m_connectionCheckTimer(nullptr)
     , m_threadFinished(false)
+    , m_protocolParser(nullptr)
+    , m_handshakeTimer(nullptr)
+    , m_connecting(false)
+    , m_handshakeRetries(0)
     , m_baudRate(QSerialPort::Baud9600)
     , m_dataBits(QSerialPort::Data8)
     , m_parity(QSerialPort::NoParity)
@@ -68,10 +72,12 @@ void CommunicationWorker::run()
     // 在子线程中创建定时器
     m_pollTimer = new QTimer();
     m_connectionCheckTimer = new QTimer();
+    m_handshakeTimer = new QTimer();
 
     // 连接信号槽（在子线程中）
     connect(m_pollTimer, &QTimer::timeout, this, &CommunicationWorker::processCommandQueue);
     connect(m_connectionCheckTimer, &QTimer::timeout, this, &CommunicationWorker::checkConnection);
+    connect(m_handshakeTimer, &QTimer::timeout, this, &CommunicationWorker::onHandshakeTimeout);
 
     // 连接主线程的请求信号到子线程的执行槽
     connect(this, &CommunicationWorker::connectRequested, this, &CommunicationWorker::doConnectDevice, Qt::QueuedConnection);
@@ -98,10 +104,13 @@ void CommunicationWorker::run()
     // 清理定时器
     m_pollTimer->stop();
     m_connectionCheckTimer->stop();
+    m_handshakeTimer->stop();
     delete m_pollTimer;
     delete m_connectionCheckTimer;
+    delete m_handshakeTimer;
     m_pollTimer = nullptr;
     m_connectionCheckTimer = nullptr;
+    m_handshakeTimer = nullptr;
 
     {
         QMutexLocker locker(&m_stateMutex);
@@ -150,10 +159,9 @@ void CommunicationWorker::sendCommand(QSharedPointer<ICommand> command)
 
 void CommunicationWorker::doConnectDevice()
 {
-    if (!m_serialPort) return;
+    if (!m_serialPort || m_connecting) return;
 
     if (!m_serialPort->isOpen()) {
-        // 更新串口配置（主线程可能已更新配置）
         {
             QMutexLocker locker(&m_configMutex);
             m_serialPort->setPortName(m_portName);
@@ -165,10 +173,10 @@ void CommunicationWorker::doConnectDevice()
         }
 
         if (m_serialPort->open(QIODevice::ReadWrite)) {
-            {
-                QMutexLocker locker(&m_stateMutex);
-                m_connected = true;
-            }
+            m_connected = false;
+            m_connecting = true;
+            m_handshakeRetries = 0;
+
             {
                 QMutexLocker locker(&m_bufferMutex);
                 m_receiveBuffer.clear();
@@ -178,17 +186,109 @@ void CommunicationWorker::doConnectDevice()
                 m_pendingCommands.clear();
                 m_state = Idle;
             }
-            emit connectionStateChanged(true);
-            emit logMessage("Device connected: " + m_serialPort->portName());
+
+            emit logMessage(QString("串口已打开，等待从机响应..."));
+            startHandshake();
         } else {
             emit logMessage("Failed to connect: " + m_serialPort->errorString());
         }
     }
 }
 
+void CommunicationWorker::startHandshake()
+{
+    if (!m_protocolParser || !m_serialPort) return;
+
+    auto handshake = CommandFactory::createReadStatusCommand(m_protocolParser);
+    m_handshakeCmd = handshake;
+
+    connect(handshake.data(), &ICommand::completed,
+            this, &CommunicationWorker::onHandshakeResult,
+            Qt::DirectConnection);
+
+    {
+        QMutexLocker locker(&m_pendingMutex);
+        m_pendingCommands[handshake->id()] = handshake;
+    }
+
+    QByteArray request = handshake->buildRequest();
+    if (!request.isEmpty()) {
+        m_serialPort->write(request);
+        m_serialPort->flush();
+    }
+
+    m_handshakeTimer->setSingleShot(true);
+    m_handshakeTimer->start(3000);
+}
+
+void CommunicationWorker::onHandshakeResult(bool success, const QVariant& result)
+{
+    if (!m_connecting) return;
+
+    m_handshakeTimer->stop();
+
+    if (success) {
+        m_connecting = false;
+        m_connected = true;
+        m_handshakeCmd.clear();
+
+        {
+            QMutexLocker locker(&m_pendingMutex);
+            m_state = Idle;
+            m_pendingCommands.clear();
+        }
+
+        emit connectionStateChanged(true);
+        emit logMessage(QString("设备已连接: 从机响应正常"));
+    } else {
+        m_handshakeRetries++;
+        if (m_handshakeRetries < 2) {
+            emit logMessage(QString("握手响应无效，重试(%1/2)...").arg(m_handshakeRetries));
+            m_handshakeCmd.clear();
+            startHandshake();
+        } else {
+            emit logMessage(QString("握手失败: 从机无有效响应"));
+            m_connecting = false;
+            m_handshakeCmd.clear();
+            if (m_serialPort && m_serialPort->isOpen()) {
+                m_serialPort->close();
+            }
+            emit connectionStateChanged(false);
+        }
+    }
+}
+
+void CommunicationWorker::onHandshakeTimeout()
+{
+    if (!m_connecting) return;
+
+    m_connecting = false;
+    m_handshakeCmd.clear();
+
+    {
+        QMutexLocker locker(&m_pendingMutex);
+        m_state = Idle;
+        m_pendingCommands.clear();
+    }
+
+    if (m_serialPort && m_serialPort->isOpen()) {
+        m_serialPort->close();
+    }
+
+    emit logMessage(QString("握手超时: 从机无响应，已断开连接"));
+    emit connectionStateChanged(false);
+}
+
 void CommunicationWorker::doDisconnectDevice()
 {
     if (!m_serialPort) return;
+
+    // 取消正在进行的握手
+    if (m_connecting) {
+        m_connecting = false;
+        m_handshakeTimer->stop();
+        m_handshakeCmd.clear();
+    }
 
     if (m_serialPort->isOpen()) {
         m_serialPort->close();

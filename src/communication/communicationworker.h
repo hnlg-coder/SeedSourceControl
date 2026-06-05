@@ -122,6 +122,11 @@ public slots:
      */
     void sendCommand(QSharedPointer<ICommand> command);
 
+    /**
+     * @brief 设置协议解析器（主线程调用）
+     */
+    void setProtocolParser(IProtocolParser* parser) { m_protocolParser = parser; }
+
 protected:
     /**
      * @brief 线程主循环
@@ -173,6 +178,21 @@ private slots:
      */
     void doSendCommand(QSharedPointer<ICommand> command);
 
+    /**
+     * @brief 发送握手命令（在子线程中执行）
+     */
+    void startHandshake();
+
+    /**
+     * @brief 处理握手结果（在子线程中执行）
+     */
+    void onHandshakeResult(bool success, const QVariant& result);
+
+    /**
+     * @brief 握手超时处理（在子线程中执行）
+     */
+    void onHandshakeTimeout();
+
 private:
     /**
      * @brief 通信状态枚举
@@ -197,6 +217,14 @@ private:
     QTimer* m_pollTimer;      // 轮询定时器
     QTimer* m_connectionCheckTimer; // 连接检查定时器
     bool m_threadFinished;    // 线程是否已完成
+
+    IProtocolParser* m_protocolParser;  // 协议解析器
+
+    // 握手状态
+    QSharedPointer<ICommand> m_handshakeCmd;  // 握手命令
+    QTimer* m_handshakeTimer;                 // 握手超时定时器
+    bool m_connecting;                        // 是否正在握手
+    int m_handshakeRetries;                   // 握手重试计数
 
     QByteArray m_receiveBuffer; // 接收缓冲区
 

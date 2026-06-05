@@ -182,6 +182,7 @@ void MainWindow::initializeComponents()
     m_protocolParser = new SeedSourceProtocolParser(this);
     m_dataModel = new DeviceDataModel(this);
     m_communicationWorker = new CommunicationWorker(this);
+    m_communicationWorker->setProtocolParser(m_protocolParser);
 
     // 注册跨线程信号槽传递的类型
     qRegisterMetaType<QSharedPointer<ICommand>>("QSharedPointer<ICommand>");
