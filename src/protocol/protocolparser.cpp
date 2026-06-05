@@ -1,148 +1,119 @@
 #include "protocolparser.h"
 #include <QDebug>
 
-/**
- * @brief 构造函数
- * @param parent 父对象指针
- */
 SeedSourceProtocolParser::SeedSourceProtocolParser(QObject* parent)
     : QObject(parent)
-    , m_deviceAddress(0x01)  // 默认设备地址为0x01
+    , m_deviceAddress(0x01)
 {
 }
 
-/**
- * @brief 构建协议帧
- * @param type 命令类型
- * @param data 命令数据
- * @return 构建好的完整协议帧
- * 
- * 协议帧格式：[帧头 0xAA][地址码][命令码][数据长度 L][数据*L][校验和][帧尾 0x55]
- */
 QByteArray SeedSourceProtocolParser::buildFrame(CommandType type, const QVariant& data)
 {
     QByteArray frame;
-    frame.append(FRAME_HEADER);  // 添加帧头
-    frame.append(m_deviceAddress);  // 添加设备地址
-    
-    quint8 commandCode = 0;  // 命令码
-    QByteArray payload;      // 数据载荷
-    
-    // 根据命令类型构建不同的协议帧
+    frame.append(FRAME_HEADER);
+
+    quint8 addrByte = 0;
+    quint8 commandCode = 0;
+    QByteArray payload;
+
     switch (type) {
-        case CommandType::ReadRegister: {  // 读寄存器命令
-            commandCode = 0x01;
+        case CommandType::ReadRegister: {
+            commandCode = CMD_READ_REG;
             QVariantList list = data.toList();
             if (list.size() >= 2) {
-                quint8 baseAddr = list[0].toUInt();  // 基地址
-                quint8 offset = list[1].toUInt();     // 偏移地址
-                payload.append(baseAddr);
-                payload.append(offset);
+                quint8 baseAddr = list[0].toUInt();
+                quint8 offset = list[1].toUInt();
+                // 协议V1.3: ADDR = (baseAddr << 4) | offset
+                addrByte = static_cast<quint8>((baseAddr << 4) | (offset & 0x0F));
+                // payload: 读取字节数，默认4字节
+                quint8 readLen = list.size() >= 3 ? list[2].toUInt() : 4;
+                payload.append(readLen);
             }
             break;
         }
-        case CommandType::WriteRegister: {  // 写寄存器命令
-            commandCode = 0x02;
+        case CommandType::WriteRegister: {
+            commandCode = CMD_WRITE_REG;
             QVariantList list = data.toList();
             if (list.size() >= 3) {
-                quint8 baseAddr = list[0].toUInt();    // 基地址
-                quint8 offset = list[1].toUInt();       // 偏移地址
-                quint32 value = list[2].toUInt();       // 要写入的值
-                payload.append(baseAddr);
-                payload.append(offset);
-                // 将32位值按大端序写入
-                payload.append((value >> 24) & 0xFF);
-                payload.append((value >> 16) & 0xFF);
-                payload.append((value >> 8) & 0xFF);
-                payload.append(value & 0xFF);
+                quint8 baseAddr = list[0].toUInt();
+                quint8 offset = list[1].toUInt();
+                quint32 value = list[2].toUInt();
+                addrByte = static_cast<quint8>((baseAddr << 4) | (offset & 0x0F));
+                // payload: 写入字节数 + 大端序值
+                quint8 writeLen = list.size() >= 4 ? list[3].toUInt() : 4;
+                payload.append(writeLen);
+                for (int i = writeLen - 1; i >= 0; --i) {
+                    payload.append(static_cast<quint8>((value >> (i * 8)) & 0xFF));
+                }
             }
             break;
         }
-        case CommandType::ReadStatus: {  // 读状态命令
-            commandCode = 0x03;
+        case CommandType::ReadStatus: {
+            commandCode = CMD_READ_STATUS;
+            // 自定义批量状态读取命令（固件扩展），无payload
             break;
         }
-        case CommandType::ControlDevice: {  // 设备控制命令
-            commandCode = 0x04;
-            payload.append(data.toUInt() & 0xFF);  // 控制参数
+        case CommandType::ControlDevice: {
+            commandCode = CMD_CONTROL;
+            payload.append(data.toUInt() & 0xFF);
             break;
         }
         default:
-            return QByteArray();  // 未知命令，返回空帧
+            return QByteArray();
     }
-    
-    // 组装完整协议帧
-    frame.append(commandCode);                          // 命令码
-    frame.append(static_cast<quint8>(payload.size()));  // 数据长度
-    frame.append(payload);                              // 数据载荷
-    
-    // 计算并添加校验和
+
+    frame.append(addrByte);
+    frame.append(commandCode);
+    frame.append(static_cast<quint8>(payload.size()));
+    frame.append(payload);
+
     quint8 checksum = calculateChecksum(frame);
     frame.append(checksum);
-    frame.append(FRAME_TAIL);  // 添加帧尾
-    
+    frame.append(FRAME_TAIL);
+
     return frame;
 }
 
-/**
- * @brief 解析接收到的协议帧
- * @param frame 接收到的协议帧数据
- * @param data 解析后的数据输出
- * @return 解析是否成功
- */
 bool SeedSourceProtocolParser::parseFrame(const QByteArray& frame, DeviceData& data)
 {
-    // 1. 检查帧长度是否足够
-    if (frame.size() < 6) {  // 最小帧长度：头+地址+命令+长度+校验+尾
+    if (frame.size() < 6) {
         return false;
     }
-    
-    // 2. 检查帧头是否正确
+
     if (static_cast<quint8>(frame[0]) != FRAME_HEADER) {
         return false;
     }
-    
-    // 3. 检查帧尾是否正确
+
     if (static_cast<quint8>(frame[frame.size() - 1]) != FRAME_TAIL) {
         return false;
     }
-    
-    // 4. 检查数据长度是否匹配
+
     quint8 dataLength = static_cast<quint8>(frame[3]);
-    if (frame.size() != 5 + dataLength + 1) {  // 5=头+地址+命令+长度+校验位位置
+    if (frame.size() != 6 + dataLength) {
         return false;
     }
-    
-    // 5. 验证校验和
-    QByteArray checksumData = frame.left(frame.size() - 2);  // 取除校验和和帧尾外的数据
+
+    QByteArray checksumData = frame.left(frame.size() - 2);
     quint8 calculatedChecksum = calculateChecksum(checksumData);
     quint8 receivedChecksum = static_cast<quint8>(frame[frame.size() - 2]);
-    
+
     if (calculatedChecksum != receivedChecksum) {
-        qDebug() << "校验和错误: 计算值" << calculatedChecksum << "接收值" << receivedChecksum;
+        qDebug() << "checksum mismatch: calc" << calculatedChecksum << "recv" << receivedChecksum;
         return false;
     }
-    
-    // 6. 提取数据
-    data.address = static_cast<quint8>(frame[1]);  // 设备地址
-    data.command = static_cast<quint8>(frame[2]);  // 命令码
-    data.data = frame.mid(4, dataLength);         // 数据载荷
-    
+
+    data.address = static_cast<quint8>(frame[1]);
+    data.command = static_cast<quint8>(frame[2]);
+    data.data = frame.mid(4, dataLength);
+
     return true;
 }
 
-/**
- * @brief 计算校验和
- * @param data 需要计算校验和的数据
- * @return 计算出的校验和（低8位）
- * 
- * 校验和计算方法：从帧头到数据部分的累加和，取低8位
- */
 quint8 SeedSourceProtocolParser::calculateChecksum(const QByteArray& data)
 {
     quint32 sum = 0;
     for (int i = 0; i < data.size(); ++i) {
-        sum += static_cast<quint8>(data[i]);  // 累加所有字节
+        sum += static_cast<quint8>(data[i]);
     }
-    return static_cast<quint8>(sum & 0xFF);  // 返回低8位
+    return static_cast<quint8>(sum & 0xFF);
 }

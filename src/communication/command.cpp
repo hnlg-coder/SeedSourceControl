@@ -1,6 +1,5 @@
 #include "command.h"
 #include <QDebug>
-#include <QMetaObject>
 
 std::atomic<quint32> ICommand::s_nextId{1};
 
@@ -26,55 +25,68 @@ void ICommand::execute()
     }
 
     setState(WaitingResponse);
-    // 使用QMetaObject::invokeMethod确保QTimer在ICommand所在线程启动
-    // ICommand可能在主线程创建（QTimer也在主线程），但execute()可能从子线程调用
-    QMetaObject::invokeMethod(m_timeoutTimer, "start", Qt::QueuedConnection,
-                              Q_ARG(int, static_cast<int>(timeout())));
+    m_timeoutTimer->start(static_cast<int>(timeout()));
     emit sendRequest(request);
 }
 
 void ICommand::onResponse(const QByteArray& response)
 {
-    // 确保在ICommand所在线程停止定时器
-    QMetaObject::invokeMethod(m_timeoutTimer, "stop", Qt::QueuedConnection);
+    CommandState expected = WaitingResponse;
+    if (!m_state.compare_exchange_strong(expected, Processing,
+            std::memory_order_acq_rel, std::memory_order_acquire)) {
+        return;
+    }
 
-    if (m_state == WaitingResponse) {
-        if (parseResponse(response)) {
-            setState(Completed);
-            emit completed(true, m_result);
-        } else {
-            setState(Error);
-            setError("Failed to parse response");
-            emit completed(false, QVariant());
-        }
+    m_timeoutTimer->stop();
+
+    if (parseResponse(response)) {
+        QMutexLocker locker(&m_resultMutex);
+        m_state.store(Completed, std::memory_order_release);
+        QVariant result = m_result;
+        locker.unlock();
+        emit completed(true, result);
+    } else {
+        QMutexLocker locker(&m_resultMutex);
+        m_state.store(Error, std::memory_order_release);
+        m_errorString = QStringLiteral("Failed to parse response");
+        locker.unlock();
+        emit completed(false, QVariant());
     }
 }
 
 void ICommand::onTimeout()
 {
-    m_timeoutTimer->stop();
-    if (m_state == WaitingResponse) {
-        setState(Timeout);
-        setError("Command timeout");
-        emit completed(false, QVariant());
+    CommandState expected = WaitingResponse;
+    if (!m_state.compare_exchange_strong(expected, Timeout,
+            std::memory_order_acq_rel, std::memory_order_acquire)) {
+        return;
     }
+
+    m_timeoutTimer->stop();
+    {
+        QMutexLocker locker(&m_resultMutex);
+        m_errorString = QStringLiteral("Command timeout");
+    }
+    emit completed(false, QVariant());
 }
 
 void ICommand::setState(CommandState state)
 {
-    if (m_state != state) {
-        m_state = state;
-        emit stateChanged(m_state);
+    CommandState old = m_state.exchange(state, std::memory_order_acq_rel);
+    if (old != state) {
+        emit stateChanged(state);
     }
 }
 
 void ICommand::setResult(const QVariant& result)
 {
+    QMutexLocker locker(&m_resultMutex);
     m_result = result;
 }
 
 void ICommand::setError(const QString& error)
 {
+    QMutexLocker locker(&m_resultMutex);
     m_errorString = error;
 }
 
@@ -88,6 +100,7 @@ ReadRegisterCommand::ReadRegisterCommand(quint8 baseAddr, quint8 offset, IProtoc
 
 QByteArray ReadRegisterCommand::buildRequest()
 {
+    if (!m_parser) return QByteArray();
     QVariantList data;
     data << m_baseAddr << m_offset;
     return m_parser->buildFrame(CommandType::ReadRegister, data);
@@ -95,6 +108,7 @@ QByteArray ReadRegisterCommand::buildRequest()
 
 bool ReadRegisterCommand::parseResponse(const QByteArray& response)
 {
+    if (!m_parser) return false;
     DeviceData data;
     if (m_parser->parseFrame(response, data)) {
         if (data.data.size() >= 4) {
@@ -121,6 +135,7 @@ WriteRegisterCommand::WriteRegisterCommand(quint8 baseAddr, quint8 offset, quint
 
 QByteArray WriteRegisterCommand::buildRequest()
 {
+    if (!m_parser) return QByteArray();
     QVariantList data;
     data << m_baseAddr << m_offset << m_value;
     return m_parser->buildFrame(CommandType::WriteRegister, data);
@@ -128,6 +143,7 @@ QByteArray WriteRegisterCommand::buildRequest()
 
 bool WriteRegisterCommand::parseResponse(const QByteArray& response)
 {
+    if (!m_parser) return false;
     DeviceData data;
     if (m_parser->parseFrame(response, data)) {
         setResult(m_value);
@@ -144,16 +160,17 @@ ReadStatusCommand::ReadStatusCommand(IProtocolParser* parser, QObject* parent)
 
 QByteArray ReadStatusCommand::buildRequest()
 {
+    if (!m_parser) return QByteArray();
     return m_parser->buildFrame(CommandType::ReadStatus, QVariant());
 }
 
 bool ReadStatusCommand::parseResponse(const QByteArray& response)
 {
+    if (!m_parser) return false;
     DeviceData data;
     if (m_parser->parseFrame(response, data)) {
         QVariantMap statusMap;
 
-        // 辅助lambda: 从字节数组中提取32位大端值
         auto extractU32 = [](const QByteArray& arr, int offset) -> quint32 {
             quint32 val = 0;
             val |= static_cast<quint8>(arr[offset]) << 24;
@@ -163,23 +180,18 @@ bool ReadStatusCommand::parseResponse(const QByteArray& response)
             return val;
         };
 
-        // 解析 STATUS 寄存器 (偏移0-3)
         if (data.data.size() >= 4) {
             statusMap["status"] = extractU32(data.data, 0);
         }
-        // 解析 ALERT 寄存器 (偏移4-7)
         if (data.data.size() >= 8) {
             statusMap["alarm"] = extractU32(data.data, 4);
         }
-        // 解析 CUR 寄存器 (偏移8-11)
         if (data.data.size() >= 12) {
             statusMap["current"] = extractU32(data.data, 8);
         }
-        // 解析 TEMP 寄存器 (偏移12-15)
         if (data.data.size() >= 16) {
             statusMap["temperature"] = extractU32(data.data, 12);
         }
-        // 解析 POWER 寄存器 (偏移16-19)
         if (data.data.size() >= 20) {
             statusMap["power"] = extractU32(data.data, 16);
         }
@@ -199,6 +211,7 @@ ControlDeviceCommand::ControlDeviceCommand(ControlAction action, IProtocolParser
 
 QByteArray ControlDeviceCommand::buildRequest()
 {
+    if (!m_parser) return QByteArray();
     quint8 actionCode = 0;
     switch (m_action) {
         case Start: actionCode = 0x01; break;
@@ -211,9 +224,10 @@ QByteArray ControlDeviceCommand::buildRequest()
 
 bool ControlDeviceCommand::parseResponse(const QByteArray& response)
 {
+    if (!m_parser) return false;
     DeviceData data;
     if (m_parser->parseFrame(response, data)) {
-        setResult(m_action);
+        setResult(static_cast<int>(m_action));
         return true;
     }
     return false;
